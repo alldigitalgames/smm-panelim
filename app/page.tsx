@@ -19,41 +19,41 @@ export default function CustomerPanel() {
   return (
     <div className="min-h-screen bg-white text-zinc-900">
       {/* Header */}
-      <header className="border-b border-zinc-200 bg-white sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-8 py-6 flex items-center justify-between">
+      <header className="border-b border-zinc-200 bg-white sticky top-0 z-50 shadow-sm">
+        <div className="max-w-7xl mx-auto px-8 py-5 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Image 
               src="https://i.imgur.com/m6LJN2h.png" 
               alt="All Digital Games" 
               width={220} 
               height={60}
-              className="h-14 w-auto"
+              className="h-12 w-auto"
             />
-            <div className="text-3xl font-bold text-emerald-600 tracking-tight">SMM Panel</div>
+            <div className="text-3xl font-bold text-emerald-600 tracking-tighter">SMM Panel</div>
           </div>
 
-          <nav className="flex gap-10 text-sm font-medium text-zinc-700">
-            <a href="#services" className="hover:text-emerald-600 transition">Hizmetler</a>
-            <a href="#orders" className="hover:text-emerald-600 transition">Siparişlerim</a>
-            <a href="#" className="hover:text-emerald-600 transition">Bakiye</a>
+          <nav className="flex gap-10 text-sm font-medium">
+            <a href="#services" className="hover:text-emerald-600 transition-colors">Hizmetler</a>
+            <a href="#orders" className="hover:text-emerald-600 transition-colors">Siparişlerim</a>
+            <a href="#" className="hover:text-emerald-600 transition-colors">Bakiye</a>
           </nav>
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-8 py-20">
+      <div className="max-w-7xl mx-auto px-8 py-16">
         {/* Hero */}
         <div className="text-center mb-20">
-          <h1 className="text-6xl font-bold mb-4 text-zinc-900">Profesyonel SMM Hizmetleri</h1>
+          <h1 className="text-6xl font-bold mb-6 text-zinc-900">Profesyonel SMM Hizmetleri</h1>
           <p className="text-xl text-zinc-600 max-w-2xl mx-auto">
             ItemSatış satışlarınız otomatik olarak teslim edilir.<br />
             Hızlı, güvenilir ve tamamen otomatik sistem.
           </p>
         </div>
 
-        {/* Hizmetler - Yan Yana */}
+        {/* Hizmetler - Yan Yana Grid */}
         <div id="services">
-          <div className="flex justify-between items-center mb-12">
-            <h2 className="text-4xl font-bold text-zinc-900">Hizmetlerimiz</h2>
+          <div className="flex justify-between items-end mb-12">
+            <h2 className="text-4xl font-bold">Hizmetlerimiz</h2>
             <p className="text-zinc-500">En popüler ve kaliteli SMM hizmetleri</p>
           </div>
 
@@ -61,15 +61,15 @@ export default function CustomerPanel() {
             {services.map((service, index) => (
               <div 
                 key={index}
-                className="group border border-zinc-200 hover:border-emerald-500 hover:shadow-xl rounded-3xl p-10 bg-white transition-all duration-300"
+                className="group border border-zinc-200 hover:border-emerald-500 hover:shadow-2xl rounded-3xl p-10 bg-white transition-all duration-300"
               >
                 {service.popular && (
                   <div className="inline-flex bg-emerald-100 text-emerald-700 text-xs font-bold px-5 py-2 rounded-full mb-6">
                     ⭐ EN POPÜLER
                   </div>
                 )}
-
-                <h3 className="text-2xl font-semibold mb-3 text-zinc-900">{service.name}</h3>
+                
+                <h3 className="text-2xl font-semibold mb-3">{service.name}</h3>
                 <p className="text-zinc-500 mb-10">{service.category}</p>
 
                 <div className="flex items-baseline mb-12">
@@ -89,8 +89,8 @@ export default function CustomerPanel() {
         </div>
       </div>
 
-      <footer className="bg-zinc-100 py-10 text-center text-zinc-600 text-sm border-t border-zinc-200">
-        © All Digital Games • Otomatik SMM Panel • MoreThanPanel + SMMKings ile güçlendirildi
+      <footer className="bg-zinc-100 py-12 text-center text-zinc-600 text-sm border-t">
+        © All Digital Games • Otomatik SMM Panel • MoreThanPanel + SMMKings
       </footer>
     </div>
   );
