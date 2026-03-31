@@ -77,13 +77,9 @@ export async function POST(request: NextRequest) {
 
     console.log(`🛒 Sipariş Alındı → ID: ${order_id} | Hizmet: ${service_name} | Miktar: ${quantity} | Link: ${finalLink ? 'VAR' : 'YOK'}`);
 
-    if (!finalLink) {
-      await sendTelegram(`⚠️ <b>Link Eksik!</b>\nSipariş ID: <code>${order_id}</code>\nHizmet: ${service_name}\nLütfen manuel kontrol edin.`);
-    }
-
     const panels = await getActivePanels();
     if (panels.length === 0) {
-      await sendTelegram(`❌ <b>Kritik:</b> Hiç aktif panel yok!\nSipariş ID: ${order_id}`);
+      await sendTelegram(`❌ <b>Kritik Hata:</b> Aktif panel bulunamadı!\nSipariş ID: <code>${order_id}</code>`);
       return NextResponse.json({ error: "No active panels" }, { status: 503 });
     }
 
@@ -91,7 +87,7 @@ export async function POST(request: NextRequest) {
     let usedPanel = "";
     let attempts = 0;
 
-    // Akıllı Failover + Retry
+    // Akıllı Failover
     for (const panel of panels) {
       attempts++;
       const result = await tryAddOrder(panel, { link: finalLink, quantity });
@@ -125,7 +121,7 @@ export async function POST(request: NextRequest) {
                   `Hizmet: ${service_name}\n` +
                   `Miktar: ${quantity}\n` +
                   `Link: ${finalLink || '—'}\n` +
-                  `Panel: ${usedPanel}\n` +
+                  `Kullanılan Panel: ${usedPanel}\n` +
                   `SMM ID: ${successResult.smm_order_id}\n` +
                   `Süre: ${duration}ms`;
 
@@ -136,8 +132,8 @@ export async function POST(request: NextRequest) {
                       `Hizmet: ${service_name}\n` +
                       `Miktar: ${quantity}\n` +
                       `Link: ${finalLink || 'Eksik'}\n` +
-                      `Deneme: ${attempts}/${panels.length}\n` +
-                      `Sebep: ${finalLink ? 'Paneller başarısız' : 'Link girilmemiş'}`;
+                      `Deneme Sayısı: ${attempts}/${panels.length}\n` +
+                      `Sebep: ${finalLink ? 'Tüm paneller başarısız' : 'Instagram linki girilmemiş'}`;
 
       await sendTelegram(failMsg);
     }
@@ -145,13 +141,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: !!successResult,
       used_panel: usedPanel,
-      duration_ms: duration,
-      attempts
+      duration_ms: duration
     });
 
   } catch (error: any) {
     console.error("Webhook kritik hata:", error);
-    await sendTelegram(`🚨 <b>Webhook Hatası!</b>\n${error.message}`);
+    await sendTelegram(`🚨 <b>Webhook Kritik Hata!</b>\n${error.message}`);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }
@@ -159,8 +154,8 @@ export async function POST(request: NextRequest) {
 export async function GET() {
   return NextResponse.json({
     status: "ok",
-    message: "Webhook Optimized v3",
-    active_panels: "2 (MoreThanPanel + SMMKings)",
-    note: "Link algılama + akıllı failover + detaylı bildirim aktif"
+    message: "Webhook Optimized v3 - 3 Panel Aktif",
+    panels: "MoreThanPanel + SMMKings + Medyabayim",
+    note: "Akıllı link algılama ve failover aktif"
   });
 }
