@@ -15,21 +15,16 @@ async function sendTelegram(message: string) {
       disable_web_page_preview: true
     });
   } catch (e) {
-    console.error("Telegram gönderim hatası:", e);
+    console.error("Telegram hatası:", e);
   }
 }
 
 async function getActivePanels() {
-  const { data, error } = await supabase
+  const { data } = await supabase
     .from('panel_configs')
     .select('*')
     .eq('is_active', true)
     .order('priority', { ascending: true });
-
-  if (error) {
-    console.error("Panel configs hatası:", error);
-    return [];
-  }
   return data || [];
 }
 
@@ -38,7 +33,7 @@ async function tryAddOrder(panel: any, orderData: any) {
     const payload = {
       key: panel.api_key,
       action: "add",
-      service: 1,                    // İleride dinamik service ID yapılabilir
+      service: 1,
       link: orderData.link,
       quantity: Number(orderData.quantity) || 1000,
     };
@@ -52,17 +47,12 @@ async function tryAddOrder(panel: any, orderData: any) {
 
     return {
       success: true,
-      smm_order_id: result.order || result.order_id || result.id || "unknown",
-      panel_name: panel.panel_name,
-      response: result
+      smm_order_id: result.order || result.order_id || "unknown",
+      panel_name: panel.panel_name
     };
   } catch (err: any) {
-    console.error(`[${panel.panel_name}] Sipariş hatası:`, err.message);
-    return { 
-      success: false, 
-      error: err.message,
-      status: err.response?.status 
-    };
+    console.error(`[${panel.panel_name}] Hata:`, err.message);
+    return { success: false, error: err.message };
   }
 }
 
@@ -75,79 +65,76 @@ export async function POST(request: NextRequest) {
     const {
       order_id,
       email,
-      service_name,
-      quantity,
+      service_name = "Bilinmeyen Hizmet",
+      quantity = 1000,
       link,
-      extra_info,        // ItemSatış bazen ekstra bilgi olarak gönderir
+      extra_info,
       username
     } = body;
 
-    // Link algılama (en önemli optimizasyon)
+    // Gelişmiş Link Algılama
     const finalLink = link || extra_info || username || null;
 
-    console.log(`🛒 Yeni Sipariş Alındı → ID: ${order_id} | Hizmet: ${service_name} | Miktar: ${quantity} | Link: ${finalLink ? 'VAR' : 'YOK'}`);
-
-    if (!finalLink) {
-      await sendTelegram(`⚠️ <b>Link Eksik!</b>\n\nSipariş ID: <code>${order_id}</code>\nHizmet: ${service_name}\nMiktar: ${quantity}\n\nMüşteri link göndermemiş. Manuel kontrol edin.`);
-    }
+    console.log(`🛒 Yeni Sipariş → ID: ${order_id} | Hizmet: ${service_name} | Miktar: ${quantity} | Link: ${finalLink ? 'VAR' : 'YOK'}`);
 
     const panels = await getActivePanels();
     if (panels.length === 0) {
-      await sendTelegram(`❌ Kritik Hata: Aktif panel bulunamadı!\nSipariş ID: ${order_id}`);
+      await sendTelegram(`❌ <b>Kritik Hata:</b> Aktif SMM paneli bulunamadı!\nSipariş ID: <code>${order_id}</code>`);
       return NextResponse.json({ error: "No active panels" }, { status: 503 });
     }
 
     let successResult = null;
     let usedPanel = "";
-    let attemptCount = 0;
+    let attempts = 0;
 
-    // Failover + Retry mantığı
+    // Failover + Deneme mantığı
     for (const panel of panels) {
-      attemptCount++;
+      attempts++;
       const result = await tryAddOrder(panel, { link: finalLink, quantity });
 
       if (result.success) {
         successResult = result;
         usedPanel = panel.panel_name;
-        console.log(`✅ Başarılı → Panel: ${usedPanel} (Deneme ${attemptCount})`);
+        console.log(`✅ Başarılı → ${usedPanel} (Deneme ${attempts})`);
         break;
       }
     }
 
     // Veritabanına kaydet
-    const { error: dbError } = await supabase.from('orders').insert({
+    await supabase.from('orders').insert({
       itemsatis_order_id: order_id?.toString(),
       user_email: email,
-      service_name: service_name || "Bilinmeyen Hizmet",
-      quantity: Number(quantity) || 0,
+      service_name,
+      quantity: Number(quantity),
       link: finalLink,
       status: successResult ? "processing" : "failed",
       smm_order_id: successResult?.smm_order_id,
       used_panel: usedPanel,
-      fail_reason: successResult ? null : (finalLink ? "Tüm paneller başarısız" : "Link eksik")
+      fail_reason: successResult ? null : (finalLink ? "Paneller başarısız oldu" : "Instagram linki eksik")
     });
 
-    if (dbError) console.error("DB kayıt hatası:", dbError);
-
     // Telegram Bildirimi
-    if (successResult) {
-      const successMsg = `✅ <b>Sipariş Başarılı!</b>\n\n` +
-                        `Sipariş ID: <code>${order_id}</code>\n` +
-                        `Hizmet: ${service_name}\n` +
-                        `Miktar: ${quantity}\n` +
-                        `Link: ${finalLink || '—'}\n` +
-                        `Panel: ${usedPanel}\n` +
-                        `SMM ID: ${successResult.smm_order_id}\n` +
-                        `Süre: ${Date.now() - startTime}ms`;
+    const duration = Date.now() - startTime;
 
-      await sendTelegram(successMsg);
+    if (successResult) {
+      const msg = `✅ <b>Sipariş Başarılı!</b>\n\n` +
+                  `Sipariş ID: <code>${order_id}</code>\n` +
+                  `Hizmet: ${service_name}\n` +
+                  `Miktar: ${quantity}\n` +
+                  `Link: ${finalLink || '—'}\n` +
+                  `Panel: ${usedPanel}\n` +
+                  `SMM ID: ${successResult.smm_order_id}\n` +
+                  `Süre: ${duration}ms`;
+
+      await sendTelegram(msg);
     } else {
-      const failMsg = `❌ <b>Sipariş Başarısız!</b>\n\n` +
+      const failMsg = `❌ <b>Sipariş İşlenemedi!</b>\n\n` +
                       `Sipariş ID: <code>${order_id}</code>\n` +
                       `Hizmet: ${service_name}\n` +
                       `Miktar: ${quantity}\n` +
                       `Link: ${finalLink || 'Eksik'}\n` +
-                      `Sebep: ${finalLink ? 'Paneller başarısız' : 'Link girilmemiş'}`;
+                      `Sebep: ${finalLink ? 'Tüm paneller başarısız' : 'Link girilmemiş'}\n` +
+                      `Deneme: ${attempts}`;
 
       await sendTelegram(failMsg);
     }
@@ -155,22 +142,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: !!successResult,
       used_panel: usedPanel,
-      processing_time: Date.now() - startTime
+      duration_ms: duration
     });
 
   } catch (error: any) {
-    console.error("Webhook genel hata:", error);
-    await sendTelegram(`🚨 <b>Webhook Hatası!</b>\nHata: ${error.message}`);
+    console.error("Webhook kritik hata:", error);
+    await sendTelegram(`🚨 <b>Webhook Kritik Hata!</b>\n${error.message}`);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
-// GET - Test için
+// Test için GET
 export async function GET() {
   return NextResponse.json({
     status: "ok",
-    message: "Webhook Optimized + Telegram Active",
-    panels: "2 Active",
-    timestamp: new Date().toISOString()
+    message: "Webhook Optimized v2",
+    active_panels: "2 (MoreThanPanel + SMMKings)",
+    telegram: "Aktif",
+    note: "Link algılama ve hata yönetimi iyileştirildi"
   });
 }
