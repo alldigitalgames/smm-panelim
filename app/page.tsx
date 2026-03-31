@@ -26,69 +26,73 @@ export default function SiparisLogPaneli() {
   };
 
   return (
-    <div className="min-h-screen bg-white text-zinc-900">
+    <div className="min-h-screen bg-zinc-950 text-white">
       {/* Header */}
-      <header className="border-b border-zinc-200 bg-white sticky top-0 z-50 shadow-sm">
+      <header className="border-b border-zinc-800 bg-zinc-900 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-8 py-6 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="text-4xl font-bold text-emerald-600">ADG</div>
+            <div className="text-4xl font-bold text-emerald-400">ADG</div>
             <div>
               <div className="text-2xl font-bold tracking-tight">ALL DIGITAL GAMES</div>
-              <div className="text-sm text-emerald-600 -mt-1">SMM Panel • Sipariş Kayıtları</div>
+              <div className="text-sm text-emerald-400 -mt-1">SMM Panel • Sipariş Kayıtları</div>
             </div>
           </div>
+          <button 
+            onClick={fetchOrders}
+            className="px-5 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-sm transition"
+          >
+            🔄 Yenile
+          </button>
         </div>
       </header>
 
       <div className="max-w-7xl mx-auto px-8 py-12">
-        <div className="flex justify-between items-center mb-10">
-          <h1 className="text-4xl font-bold">Sipariş Logları</h1>
-          <button 
-            onClick={fetchOrders}
-            className="px-5 py-2 bg-zinc-100 hover:bg-zinc-200 rounded-xl text-sm font-medium transition"
-          >
-            Yenile
-          </button>
-        </div>
+        <h1 className="text-4xl font-bold mb-10">Sipariş Logları</h1>
 
         {loading ? (
           <p className="text-center py-20 text-zinc-500">Yükleniyor...</p>
         ) : orders.length === 0 ? (
-          <p className="text-center py-20 text-zinc-500">Henüz hiç sipariş kaydı yok.</p>
+          <p className="text-center py-20 text-zinc-500">Henüz sipariş kaydı bulunmuyor.</p>
         ) : (
-          <div className="overflow-x-auto rounded-2xl border border-zinc-100">
-            <table className="w-full">
-              <thead className="bg-zinc-50">
-                <tr>
-                  <th className="px-6 py-4 text-left font-medium text-zinc-600">Sipariş No</th>
-                  <th className="px-6 py-4 text-left font-medium text-zinc-600">Tarih & Saat</th>
-                  <th className="px-6 py-4 text-left font-medium text-zinc-600">İlan / Hizmet</th>
-                  <th className="px-6 py-4 text-left font-medium text-zinc-600">Kullanılan Panel</th>
-                  <th className="px-6 py-4 text-left font-medium text-zinc-600">Durum</th>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse bg-zinc-900 rounded-2xl overflow-hidden">
+              <thead>
+                <tr className="bg-zinc-800 border-b border-zinc-700">
+                  <th className="px-6 py-5 text-left font-medium text-zinc-400">Sipariş No</th>
+                  <th className="px-6 py-5 text-left font-medium text-zinc-400">Tarih & Saat</th>
+                  <th className="px-6 py-5 text-left font-medium text-zinc-400">Hizmet / İlan</th>
+                  <th className="px-6 py-5 text-left font-medium text-zinc-400">Kullanılan Panel</th>
+                  <th className="px-6 py-5 text-left font-medium text-zinc-400">Durum</th>
+                  <th className="px-6 py-5 text-left font-medium text-zinc-400">Link</th>
                 </tr>
               </thead>
-              <tbody className="divide-y">
+              <tbody className="divide-y divide-zinc-800">
                 {orders.map((order) => (
-                  <tr key={order.id} className="hover:bg-zinc-50">
-                    <td className="px-6 py-5 font-mono text-sm">{order.itemsatis_order_id || '-'}</td>
-                    <td className="px-6 py-5 text-sm">
+                  <tr key={order.id} className="hover:bg-zinc-800/50 transition">
+                    <td className="px-6 py-5 font-mono text-sm text-zinc-300">
+                      {order.itemsatis_order_id || '-'}
+                    </td>
+                    <td className="px-6 py-5 text-sm text-zinc-400">
                       {new Date(order.created_at).toLocaleString('tr-TR')}
                     </td>
-                    <td className="px-6 py-5">{order.service_name}</td>
+                    <td className="px-6 py-5 text-zinc-200">{order.service_name}</td>
                     <td className="px-6 py-5">
-                      <span className="px-4 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-medium">
-                        {order.used_panel || 'Belirtilmedi'}
+                      <span className="px-4 py-1.5 bg-emerald-900 text-emerald-400 rounded-full text-xs font-medium">
+                        {order.used_panel || '—'}
                       </span>
                     </td>
                     <td className="px-6 py-5">
-                      <span className={`px-4 py-1 rounded-full text-xs font-medium ${
-                        order.status === 'completed' || order.status === 'processing' 
-                          ? 'bg-emerald-100 text-emerald-700' 
-                          : 'bg-red-100 text-red-700'
+                      <span className={`px-4 py-1.5 rounded-full text-xs font-medium ${
+                        order.status === 'completed' ? 'bg-green-900 text-green-400' :
+                        order.status === 'processing' ? 'bg-amber-900 text-amber-400' : 
+                        'bg-red-900 text-red-400'
                       }`}>
                         {order.status === 'completed' ? 'Tamamlandı' : 
                          order.status === 'processing' ? 'İşleniyor' : 'Başarısız'}
                       </span>
+                    </td>
+                    <td className="px-6 py-5 text-sm text-zinc-400 truncate max-w-xs">
+                      {order.link ? order.link.substring(0, 50) + '...' : '-'}
                     </td>
                   </tr>
                 ))}
