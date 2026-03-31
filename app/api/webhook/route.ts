@@ -28,6 +28,20 @@ async function getActivePanels() {
   return data || [];
 }
 
+// Hibrit Panel Seçimi Mantığı
+function getPreferredPanel(service_name: string): string {
+  const lowerService = service_name.toLowerCase();
+
+  if (lowerService.includes("beğeni") && lowerService.includes("instagram")) return "morethanpanel";
+  if (lowerService.includes("takipçi") && lowerService.includes("instagram")) return "smmkings";
+  if (lowerService.includes("tiktok")) return "morethanpanel";
+  if (lowerService.includes("youtube")) return "smmkings";
+  if (lowerService.includes("twitter")) return "medyabayim";
+
+  // Varsayılan
+  return "morethanpanel";
+}
+
 async function tryAddOrder(panel: any, orderData: any) {
   try {
     const payload = {
@@ -72,10 +86,9 @@ export async function POST(request: NextRequest) {
       username
     } = body;
 
-    // Gelişmiş Link Algılama
     const finalLink = link || extra_info || username || null;
 
-    console.log(`🛒 Sipariş Alındı → ID: ${order_id} | Hizmet: ${service_name} | Miktar: ${quantity} | Link: ${finalLink ? 'VAR' : 'YOK'}`);
+    console.log(`🛒 Sipariş Alındı → ID: ${order_id} | Hizmet: ${service_name} | Link: ${finalLink ? 'VAR' : 'YOK'}`);
 
     const panels = await getActivePanels();
     if (panels.length === 0) {
@@ -83,20 +96,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No active panels" }, { status: 503 });
     }
 
+    // Hibrit Panel Seçimi
+    const preferredPanelName = getPreferredPanel(service_name);
     let successResult = null;
     let usedPanel = "";
     let attempts = 0;
 
-    // Akıllı Failover
-    for (const panel of panels) {
+    // Önce tercih edilen paneli dene
+    const preferredPanel = panels.find(p => p.panel_name === preferredPanelName);
+    if (preferredPanel) {
       attempts++;
-      const result = await tryAddOrder(panel, { link: finalLink, quantity });
-
+      const result = await tryAddOrder(preferredPanel, { link: finalLink, quantity });
       if (result.success) {
         successResult = result;
-        usedPanel = panel.panel_name;
-        console.log(`✅ Başarılı → ${usedPanel} (Deneme ${attempts}/${panels.length})`);
-        break;
+        usedPanel = preferredPanel.panel_name;
+      }
+    }
+
+    // Tercih edilen panel başarısız olursa diğerlerini dene
+    if (!successResult) {
+      for (const panel of panels) {
+        if (panel.panel_name === preferredPanelName) continue; // zaten denendi
+
+        attempts++;
+        const result = await tryAddOrder(panel, { link: finalLink, quantity });
+        if (result.success) {
+          successResult = result;
+          usedPanel = panel.panel_name;
+          break;
+        }
       }
     }
 
@@ -121,8 +149,7 @@ export async function POST(request: NextRequest) {
                   `Hizmet: ${service_name}\n` +
                   `Miktar: ${quantity}\n` +
                   `Link: ${finalLink || '—'}\n` +
-                  `Kullanılan Panel: ${usedPanel}\n` +
-                  `SMM ID: ${successResult.smm_order_id}\n` +
+                  `Kullanılan Panel: ${usedPanel} (Tercih: ${preferredPanelName})\n` +
                   `Süre: ${duration}ms`;
 
       await sendTelegram(msg);
@@ -132,8 +159,7 @@ export async function POST(request: NextRequest) {
                       `Hizmet: ${service_name}\n` +
                       `Miktar: ${quantity}\n` +
                       `Link: ${finalLink || 'Eksik'}\n` +
-                      `Deneme Sayısı: ${attempts}/${panels.length}\n` +
-                      `Sebep: ${finalLink ? 'Tüm paneller başarısız' : 'Instagram linki girilmemiş'}`;
+                      `Deneme: ${attempts}/${panels.length}`;
 
       await sendTelegram(failMsg);
     }
@@ -141,6 +167,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: !!successResult,
       used_panel: usedPanel,
+      preferred_panel: preferredPanelName,
       duration_ms: duration
     });
 
@@ -154,8 +181,8 @@ export async function POST(request: NextRequest) {
 export async function GET() {
   return NextResponse.json({
     status: "ok",
-    message: "Webhook Optimized v3 - 3 Panel Aktif",
-    panels: "MoreThanPanel + SMMKings + Medyabayim",
-    note: "Akıllı link algılama ve failover aktif"
+    message: "Webhook Optimized v4 - Hibrit Panel Seçimi Aktif",
+    panels: "3 Panel (Hibrit Mantık)",
+    note: "Hizmet türüne göre akıllı panel seçimi yapılıyor"
   });
 }
