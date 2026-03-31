@@ -2,10 +2,10 @@
 const nextConfig = {
   reactStrictMode: true,
   eslint: {
-    ignoreDuringBuilds: true,   // ← Warning'leri ignore et (build'i kurtarır)
+    ignoreDuringBuilds: true,
   },
   typescript: {
-    ignoreBuildErrors: true,    // ← TypeScript hatalarını ignore et
+    ignoreBuildErrors: true,
   },
 };
 
