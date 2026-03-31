@@ -75,11 +75,15 @@ export async function POST(request: NextRequest) {
     // Gelişmiş Link Algılama
     const finalLink = link || extra_info || username || null;
 
-    console.log(`🛒 Yeni Sipariş → ID: ${order_id} | Hizmet: ${service_name} | Miktar: ${quantity} | Link: ${finalLink ? 'VAR' : 'YOK'}`);
+    console.log(`🛒 Sipariş Alındı → ID: ${order_id} | Hizmet: ${service_name} | Miktar: ${quantity} | Link: ${finalLink ? 'VAR' : 'YOK'}`);
+
+    if (!finalLink) {
+      await sendTelegram(`⚠️ <b>Link Eksik!</b>\nSipariş ID: <code>${order_id}</code>\nHizmet: ${service_name}\nLütfen manuel kontrol edin.`);
+    }
 
     const panels = await getActivePanels();
     if (panels.length === 0) {
-      await sendTelegram(`❌ <b>Kritik Hata:</b> Aktif SMM paneli bulunamadı!\nSipariş ID: <code>${order_id}</code>`);
+      await sendTelegram(`❌ <b>Kritik:</b> Hiç aktif panel yok!\nSipariş ID: ${order_id}`);
       return NextResponse.json({ error: "No active panels" }, { status: 503 });
     }
 
@@ -87,7 +91,7 @@ export async function POST(request: NextRequest) {
     let usedPanel = "";
     let attempts = 0;
 
-    // Failover + Deneme mantığı
+    // Akıllı Failover + Retry
     for (const panel of panels) {
       attempts++;
       const result = await tryAddOrder(panel, { link: finalLink, quantity });
@@ -95,7 +99,7 @@ export async function POST(request: NextRequest) {
       if (result.success) {
         successResult = result;
         usedPanel = panel.panel_name;
-        console.log(`✅ Başarılı → ${usedPanel} (Deneme ${attempts})`);
+        console.log(`✅ Başarılı → ${usedPanel} (Deneme ${attempts}/${panels.length})`);
         break;
       }
     }
@@ -110,10 +114,9 @@ export async function POST(request: NextRequest) {
       status: successResult ? "processing" : "failed",
       smm_order_id: successResult?.smm_order_id,
       used_panel: usedPanel,
-      fail_reason: successResult ? null : (finalLink ? "Paneller başarısız oldu" : "Instagram linki eksik")
+      fail_reason: successResult ? null : (finalLink ? "Tüm paneller başarısız" : "Link eksik")
     });
 
-    // Telegram Bildirimi
     const duration = Date.now() - startTime;
 
     if (successResult) {
@@ -128,13 +131,13 @@ export async function POST(request: NextRequest) {
 
       await sendTelegram(msg);
     } else {
-      const failMsg = `❌ <b>Sipariş İşlenemedi!</b>\n\n` +
+      const failMsg = `❌ <b>Sipariş Başarısız Oldu!</b>\n\n` +
                       `Sipariş ID: <code>${order_id}</code>\n` +
                       `Hizmet: ${service_name}\n` +
                       `Miktar: ${quantity}\n` +
                       `Link: ${finalLink || 'Eksik'}\n` +
-                      `Sebep: ${finalLink ? 'Tüm paneller başarısız' : 'Link girilmemiş'}\n` +
-                      `Deneme: ${attempts}`;
+                      `Deneme: ${attempts}/${panels.length}\n` +
+                      `Sebep: ${finalLink ? 'Paneller başarısız' : 'Link girilmemiş'}`;
 
       await sendTelegram(failMsg);
     }
@@ -142,23 +145,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: !!successResult,
       used_panel: usedPanel,
-      duration_ms: duration
+      duration_ms: duration,
+      attempts
     });
 
   } catch (error: any) {
     console.error("Webhook kritik hata:", error);
-    await sendTelegram(`🚨 <b>Webhook Kritik Hata!</b>\n${error.message}`);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    await sendTelegram(`🚨 <b>Webhook Hatası!</b>\n${error.message}`);
+    return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }
 
-// Test için GET
 export async function GET() {
   return NextResponse.json({
     status: "ok",
-    message: "Webhook Optimized v2",
+    message: "Webhook Optimized v3",
     active_panels: "2 (MoreThanPanel + SMMKings)",
-    telegram: "Aktif",
-    note: "Link algılama ve hata yönetimi iyileştirildi"
+    note: "Link algılama + akıllı failover + detaylı bildirim aktif"
   });
 }
