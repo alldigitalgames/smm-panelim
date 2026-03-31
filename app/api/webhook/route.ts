@@ -6,10 +6,7 @@ async function sendTelegram(message: string) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
 
-  if (!token || !chatId) {
-    console.log("Telegram ayarları eksik");
-    return;
-  }
+  if (!token || !chatId) return;
 
   try {
     await axios.post(`https://api.telegram.org/bot${token}/sendMessage`, {
@@ -18,7 +15,7 @@ async function sendTelegram(message: string) {
       parse_mode: 'HTML'
     });
   } catch (e) {
-    console.error("Telegram gönderim hatası:", e);
+    console.error("Telegram hatası:", e);
   }
 }
 
@@ -36,7 +33,7 @@ async function tryAddOrder(panel: any, orderData: any) {
     const payload = {
       key: panel.api_key,
       action: "add",
-      service: 1, // Gerçek service ID daha sonra eklenecek
+      service: 1,
       link: orderData.link,
       quantity: orderData.quantity,
     };
@@ -47,8 +44,7 @@ async function tryAddOrder(panel: any, orderData: any) {
       smm_order_id: res.data.order || res.data.order_id || "unknown",
       panel_name: panel.panel_name
     };
-  } catch (err: any) {
-    console.error(`${panel.panel_name} başarısız:`, err.message);
+  } catch {
     return { success: false };
   }
 }
@@ -59,7 +55,6 @@ export async function POST(request: NextRequest) {
     const { order_id, email, service_name, quantity, link } = body;
 
     const panels = await getActivePanels();
-
     let successResult = null;
     let usedPanel = "";
 
@@ -72,38 +67,28 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const status = successResult ? "processing" : "failed";
-
     await supabase.from('orders').insert({
       itemsatis_order_id: order_id?.toString(),
       user_email: email,
       service_name: service_name || "Bilinmeyen Hizmet",
       quantity: Number(quantity) || 0,
       link,
-      status,
+      status: successResult ? "processing" : "failed",
       smm_order_id: successResult?.smm_order_id,
       used_panel: usedPanel
     });
 
     if (successResult) {
-      const msg = `✅ <b>Sipariş Başarılı!</b>\n\n` +
-                  `Sipariş ID: <code>${order_id}</code>\n` +
-                  `Hizmet: ${service_name}\n` +
-                  `Miktar: ${quantity}\n` +
-                  `Panel: ${usedPanel}\n` +
-                  `SMM ID: ${successResult.smm_order_id}`;
-
+      const msg = `✅ <b>Sipariş Başarılı!</b>\n\nSipariş ID: ${order_id}\nHizmet: ${service_name}\nMiktar: ${quantity}\nPanel: ${usedPanel}`;
       await sendTelegram(msg);
       return NextResponse.json({ success: true, panel: usedPanel });
     } else {
-      await sendTelegram(`❌ Tüm paneller başarısız!\nSipariş ID: ${order_id}`);
+      await sendTelegram(`❌ Tüm paneller başarısız! Sipariş ID: ${order_id}`);
       return NextResponse.json({ success: false }, { status: 502 });
     }
-
   } catch (error) {
-    console.error(error);
-    await sendTelegram(`🚨 Webhook Hatası!\n${error}`);
-    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+    await sendTelegram(`🚨 Webhook Hatası!`);
+    return NextResponse.json({ error: "Sunucu hatası" }, { status: 500 });
   }
 }
 
@@ -111,7 +96,7 @@ export async function GET() {
   return NextResponse.json({
     status: "ok",
     message: "SMM Panel Webhook + Telegram Bildirimi AKTİF",
-    active_panels: "2 (MoreThanPanel + SMMKings)",
-    telegram: "Aktif"
+    active_panels: "2 panel (MoreThanPanel + SMMKings)",
+    telegram: "Aktif ✓"
   });
 }
