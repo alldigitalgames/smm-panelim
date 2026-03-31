@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
 
     const finalLink = link || extra_info || username || null;
 
-    // Tekrar tetiklenmeyi önleme (idempotency)
+    // Tekrar tetiklenmeyi önleme (Idempotency)
     if (order_id) {
       const { data: existing } = await supabase
         .from('orders')
@@ -163,7 +163,7 @@ export async function POST(request: NextRequest) {
 export async function GET() {
   return NextResponse.json({
     status: "ok",
-    message: "Webhook Optimized v4 - 3 Panel Aktif",
-    note: "Tekrar tetiklenme koruması + akıllı failover aktif"
+    message: "Webhook Optimized v4 - Tekrar Tetiklenme Koruması Aktif",
+    panels: "3 Panel (MoreThanPanel + SMMKings + Medyabayim)"
   });
 }
