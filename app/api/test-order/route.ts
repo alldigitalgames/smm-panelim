@@ -9,12 +9,10 @@ export async function GET() {
     link: "https://www.instagram.com/p/TEST123456/"
   };
 
-  const baseUrl = "https://smm-panelim-4yesoo5u3-alldigitalgames-projects.vercel.app";
-
   try {
-    const response = await fetch(`${baseUrl}/api/webhook`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+    const response = await fetch('https://smm-panelim-4yesoo5u3-alldigitalgames-projects.vercel.app/api/webhook', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(testOrder),
     });
 
@@ -22,16 +20,16 @@ export async function GET() {
 
     return NextResponse.json({
       success: true,
-      message: "✅ Test siparişi webhook'a gönderildi",
+      message: "Test siparişi gönderildi",
       test_order_id: testOrder.order_id,
-      webhook_response: result,
-      note: "Telegram bildirimi kontrol et!"
+      webhook_response: result
     });
 
   } catch (error: any) {
     return NextResponse.json({
       success: false,
-      error: error.message || "Bilinmeyen hata"
+      error: error.message,
+      note: "Webhook endpoint'ine ulaşılamadı"
     }, { status: 500 });
   }
 }
