@@ -5,7 +5,6 @@ import axios from 'axios';
 async function sendTelegram(message: string) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
-
   if (!token || !chatId) return;
 
   try {
@@ -79,16 +78,16 @@ export async function POST(request: NextRequest) {
     });
 
     if (successResult) {
-      const msg = `✅ <b>Sipariş Başarılı!</b>\n\nSipariş ID: ${order_id}\nHizmet: ${service_name}\nMiktar: ${quantity}\nPanel: ${usedPanel}`;
+      const msg = `✅ <b>Sipariş Başarılı!</b>\n\nSipariş ID: <code>${order_id}</code>\nHizmet: ${service_name}\nMiktar: ${quantity}\nPanel: ${usedPanel}\nSMM ID: ${successResult.smm_order_id}`;
       await sendTelegram(msg);
-      return NextResponse.json({ success: true, panel: usedPanel });
+      return NextResponse.json({ success: true });
     } else {
-      await sendTelegram(`❌ Tüm paneller başarısız! Sipariş ID: ${order_id}`);
+      await sendTelegram(`❌ Tüm paneller başarısız!\nSipariş ID: ${order_id}`);
       return NextResponse.json({ success: false }, { status: 502 });
     }
   } catch (error) {
-    await sendTelegram(`🚨 Webhook Hatası!`);
-    return NextResponse.json({ error: "Sunucu hatası" }, { status: 500 });
+    await sendTelegram(`🚨 Webhook Hatası!\n${error}`);
+    return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }
 
@@ -96,7 +95,7 @@ export async function GET() {
   return NextResponse.json({
     status: "ok",
     message: "SMM Panel Webhook + Telegram Bildirimi AKTİF",
-    active_panels: "2 panel (MoreThanPanel + SMMKings)",
-    telegram: "Aktif ✓"
+    active_panels: "2 (MoreThanPanel + SMMKings)",
+    telegram: "Aktif ✅"
   });
 }
