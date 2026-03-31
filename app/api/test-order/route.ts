@@ -9,7 +9,7 @@ export async function GET() {
     link: "https://www.instagram.com/p/TEST123456/"
   };
 
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://smm-panelim-4yesoo5u3-alldigitalgames-projects.vercel.app";
+  const baseUrl = "https://smm-panelim-4yesoo5u3-alldigitalgames-projects.vercel.app";
 
   try {
     const response = await fetch(`${baseUrl}/api/webhook`, {
@@ -22,16 +22,16 @@ export async function GET() {
 
     return NextResponse.json({
       success: true,
-      message: "Test siparişi webhook'a gönderildi",
+      message: "✅ Test siparişi webhook'a gönderildi",
       test_order_id: testOrder.order_id,
       webhook_response: result,
-      note: "Telegram'a bildirim gitmiş olmalı"
+      note: "Telegram bildirimi kontrol et!"
     });
 
   } catch (error: any) {
     return NextResponse.json({
       success: false,
-      error: error.message
+      error: error.message || "Bilinmeyen hata"
     }, { status: 500 });
   }
 }
