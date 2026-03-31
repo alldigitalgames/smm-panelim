@@ -1,12 +1,17 @@
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  reactStrictMode: true,
-  eslint: {
-    ignoreDuringBuilds: true,
+{
+  "name": "smm-panelim",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
   },
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-};
-
-export default nextConfig;
+  "dependencies": {
+    "next": "15.5.9",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "@supabase/supabase-js": "^2.49.1",
+    "axios": "^1.8.0"
+  }
+}
