@@ -13,9 +13,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="tr">
-      <body className="bg-zinc-950 text-white min-h-screen">
-        {children}
-      </body>
+      <body>{children}</body>
     </html>
   );
 }
