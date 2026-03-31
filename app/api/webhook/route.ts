@@ -1,3 +1,14 @@
+// Tekrar tetiklenmeyi önleme (idempotency)
+const existingOrder = await supabase
+  .from('orders')
+  .select('id')
+  .eq('itemsatis_order_id', order_id)
+  .single();
+
+if (existingOrder.data) {
+  console.log(`Sipariş zaten işlenmiş: ${order_id}`);
+  return NextResponse.json({ success: true, message: "Already processed" });
+}
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '../../../lib/supabase';
 import axios from 'axios';
