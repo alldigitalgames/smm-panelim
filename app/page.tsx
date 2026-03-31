@@ -23,8 +23,8 @@ export default function CustomerPanel() {
         <div className="max-w-7xl mx-auto px-8 py-6 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Image 
-              src="https://imgur.com/a/m6LJN2h" 
-              alt="All Digital Games Logo" 
+              src="https://i.imgur.com/m6LJN2h.png" 
+              alt="All Digital Games" 
               width={220} 
               height={60}
               className="h-14 w-auto"
@@ -50,7 +50,7 @@ export default function CustomerPanel() {
           </p>
         </div>
 
-        {/* Hizmetler - Yan Yana Grid */}
+        {/* Hizmetler - Yan Yana */}
         <div id="services">
           <div className="flex justify-between items-center mb-12">
             <h2 className="text-4xl font-bold text-zinc-900">Hizmetlerimiz</h2>
@@ -83,4 +83,15 @@ export default function CustomerPanel() {
                 >
                   Sipariş Ver
                 </button>
-              </
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <footer className="bg-zinc-100 py-10 text-center text-zinc-600 text-sm border-t border-zinc-200">
+        © All Digital Games • Otomatik SMM Panel • MoreThanPanel + SMMKings ile güçlendirildi
+      </footer>
+    </div>
+  );
+}
