@@ -19,27 +19,123 @@ async function sendTelegram(message: string) {
   }
 }
 
-async function getActivePanels() {
-  const { data } = await supabase
+async function getServicesFromPanel(panel: any) {
+  try {
+    const response = await axios.post(panel.api_url, {
+      key: panel.api_key,
+      action: "services"
+    }, { timeout: 15000 });
+    return response.data;
+  } catch {
+    return [];
+  }
+}
+
+async function getBestPanel(service_name: string, quantity: number, salesPrice: number) {
+  const panels = await supabase
     .from('panel_configs')
     .select('*')
     .eq('is_active', true)
-    .order('priority', { ascending: true });
-  return data || [];
+    .order('priority');
+
+  let bestPanel = null;
+  let bestScore = -1;
+
+  for (const panel of panels.data || []) {
+    const services = await getServicesFromPanel(panel);
+    const matchingService = services.find((s: any) => 
+      s.name && s.name.toLowerCase().includes(service_name.toLowerCase().slice(0, 15))
+    );
+
+    if (!matchingService) continue;
+
+    const panelCost = parseFloat(matchingService.rate) * (quantity / 1000);
+    const profit = salesPrice - panelCost;
+
+    // Skor hesaplama: Kar + Başarı oranı + Hız
+    let score = profit * 10;
+    score += (panel.success_rate || 95) * 2;
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestPanel = { ...panel, estimated_cost: panelCost, estimated_profit: profit };
+    }
+  }
+
+  return bestPanel;
 }
 
-// Hibrit Panel Seçimi Mantığı
-function getPreferredPanel(service_name: string): string {
-  const lowerService = service_name.toLowerCase();
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
 
-  if (lowerService.includes("beğeni") && lowerService.includes("instagram")) return "morethanpanel";
-  if (lowerService.includes("takipçi") && lowerService.includes("instagram")) return "smmkings";
-  if (lowerService.includes("tiktok")) return "morethanpanel";
-  if (lowerService.includes("youtube")) return "smmkings";
-  if (lowerService.includes("twitter")) return "medyabayim";
+    const {
+      order_id,
+      email,
+      service_name = "Bilinmeyen Hizmet",
+      quantity = 1000,
+      link,
+      extra_info,
+      username,
+      price: salesPrice = 0   // ItemSatış'tan gelen satış fiyatı
+    } = body;
 
-  // Varsayılan
-  return "morethanpanel";
+    const finalLink = link || extra_info || username || null;
+
+    console.log(`🛒 Sipariş Alındı → ID: ${order_id} | Hizmet: ${service_name} | Satış Fiyatı: $${salesPrice}`);
+
+    // Akıllı Panel Seçimi (Fiyat Karşılaştırmalı)
+    const bestPanel = await getBestPanel(service_name, quantity, salesPrice);
+
+    if (!bestPanel) {
+      await sendTelegram(`❌ <b>Panel Seçilemedi!</b>\nSipariş ID: <code>${order_id}</code>\nHizmet: ${service_name}`);
+      return NextResponse.json({ error: "No suitable panel" }, { status: 503 });
+    }
+
+    // Siparişi seçilen panele ver
+    const result = await tryAddOrder(bestPanel, { link: finalLink, quantity });
+
+    const status = result.success ? "processing" : "failed";
+
+    await supabase.from('orders').insert({
+      itemsatis_order_id: order_id?.toString(),
+      user_email: email,
+      service_name,
+      quantity: Number(quantity),
+      link: finalLink,
+      status,
+      smm_order_id: result.success ? result.smm_order_id : null,
+      used_panel: bestPanel.panel_name,
+      sales_price: salesPrice,
+      cost_price: bestPanel.estimated_cost,
+      fail_reason: result.success ? null : "Panel başarısız"
+    });
+
+    if (result.success) {
+      const msg = `✅ <b>Sipariş Başarılı!</b>\n\n` +
+                  `Sipariş ID: <code>${order_id}</code>\n` +
+                  `Hizmet: ${service_name}\n` +
+                  `Satış Fiyatı: $${salesPrice}\n` +
+                  `Alım Maliyeti: $${bestPanel.estimated_cost.toFixed(2)}\n` +
+                  `Kar: $${bestPanel.estimated_profit.toFixed(2)}\n` +
+                  `Kullanılan Panel: ${bestPanel.panel_name}`;
+
+      await sendTelegram(msg);
+    } else {
+      await sendTelegram(`❌ <b>Sipariş Başarısız!</b>\nSipariş ID: ${order_id}\nHizmet: ${service_name}\nSeçilen Panel: ${bestPanel.panel_name}`);
+    }
+
+    return NextResponse.json({
+      success: result.success,
+      used_panel: bestPanel.panel_name,
+      estimated_profit: bestPanel.estimated_profit
+    });
+
+  } catch (error: any) {
+    console.error("Webhook hata:", error);
+    await sendTelegram(`🚨 Webhook Hatası!\n${error.message}`);
+    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+  }
 }
 
 async function tryAddOrder(panel: any, orderData: any) {
@@ -52,137 +148,22 @@ async function tryAddOrder(panel: any, orderData: any) {
       quantity: Number(orderData.quantity) || 1000,
     };
 
-    const response = await axios.post(panel.api_url, payload, {
-      timeout: 25000,
-      headers: { 'Content-Type': 'application/json' }
-    });
-
+    const response = await axios.post(panel.api_url, payload, { timeout: 25000 });
     const result = response.data;
 
     return {
       success: true,
-      smm_order_id: result.order || result.order_id || "unknown",
-      panel_name: panel.panel_name
+      smm_order_id: result.order || result.order_id || "unknown"
     };
   } catch (err: any) {
-    console.error(`[${panel.panel_name}] Hata:`, err.message);
-    return { success: false, error: err.message };
-  }
-}
-
-export async function POST(request: NextRequest) {
-  const startTime = Date.now();
-
-  try {
-    const body = await request.json();
-
-    const {
-      order_id,
-      email,
-      service_name = "Bilinmeyen Hizmet",
-      quantity = 1000,
-      link,
-      extra_info,
-      username
-    } = body;
-
-    const finalLink = link || extra_info || username || null;
-
-    console.log(`🛒 Sipariş Alındı → ID: ${order_id} | Hizmet: ${service_name} | Link: ${finalLink ? 'VAR' : 'YOK'}`);
-
-    const panels = await getActivePanels();
-    if (panels.length === 0) {
-      await sendTelegram(`❌ <b>Kritik Hata:</b> Aktif panel bulunamadı!\nSipariş ID: <code>${order_id}</code>`);
-      return NextResponse.json({ error: "No active panels" }, { status: 503 });
-    }
-
-    // Hibrit Panel Seçimi
-    const preferredPanelName = getPreferredPanel(service_name);
-    let successResult = null;
-    let usedPanel = "";
-    let attempts = 0;
-
-    // Önce tercih edilen paneli dene
-    const preferredPanel = panels.find(p => p.panel_name === preferredPanelName);
-    if (preferredPanel) {
-      attempts++;
-      const result = await tryAddOrder(preferredPanel, { link: finalLink, quantity });
-      if (result.success) {
-        successResult = result;
-        usedPanel = preferredPanel.panel_name;
-      }
-    }
-
-    // Tercih edilen panel başarısız olursa diğerlerini dene
-    if (!successResult) {
-      for (const panel of panels) {
-        if (panel.panel_name === preferredPanelName) continue; // zaten denendi
-
-        attempts++;
-        const result = await tryAddOrder(panel, { link: finalLink, quantity });
-        if (result.success) {
-          successResult = result;
-          usedPanel = panel.panel_name;
-          break;
-        }
-      }
-    }
-
-    // Veritabanına kaydet
-    await supabase.from('orders').insert({
-      itemsatis_order_id: order_id?.toString(),
-      user_email: email,
-      service_name,
-      quantity: Number(quantity),
-      link: finalLink,
-      status: successResult ? "processing" : "failed",
-      smm_order_id: successResult?.smm_order_id,
-      used_panel: usedPanel,
-      fail_reason: successResult ? null : (finalLink ? "Tüm paneller başarısız" : "Link eksik")
-    });
-
-    const duration = Date.now() - startTime;
-
-    if (successResult) {
-      const msg = `✅ <b>Sipariş Başarılı!</b>\n\n` +
-                  `Sipariş ID: <code>${order_id}</code>\n` +
-                  `Hizmet: ${service_name}\n` +
-                  `Miktar: ${quantity}\n` +
-                  `Link: ${finalLink || '—'}\n` +
-                  `Kullanılan Panel: ${usedPanel} (Tercih: ${preferredPanelName})\n` +
-                  `Süre: ${duration}ms`;
-
-      await sendTelegram(msg);
-    } else {
-      const failMsg = `❌ <b>Sipariş Başarısız Oldu!</b>\n\n` +
-                      `Sipariş ID: <code>${order_id}</code>\n` +
-                      `Hizmet: ${service_name}\n` +
-                      `Miktar: ${quantity}\n` +
-                      `Link: ${finalLink || 'Eksik'}\n` +
-                      `Deneme: ${attempts}/${panels.length}`;
-
-      await sendTelegram(failMsg);
-    }
-
-    return NextResponse.json({
-      success: !!successResult,
-      used_panel: usedPanel,
-      preferred_panel: preferredPanelName,
-      duration_ms: duration
-    });
-
-  } catch (error: any) {
-    console.error("Webhook kritik hata:", error);
-    await sendTelegram(`🚨 <b>Webhook Kritik Hata!</b>\n${error.message}`);
-    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+    return { success: false };
   }
 }
 
 export async function GET() {
   return NextResponse.json({
     status: "ok",
-    message: "Webhook Optimized v4 - Hibrit Panel Seçimi Aktif",
-    panels: "3 Panel (Hibrit Mantık)",
-    note: "Hizmet türüne göre akıllı panel seçimi yapılıyor"
+    message: "Fiyat Karşılaştırmalı Webhook v1 Aktif",
+    note: "Hizmet fiyatları karşılaştırılarak en uygun panel seçiliyor"
   });
 }
