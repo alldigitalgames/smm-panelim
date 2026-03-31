@@ -25,47 +25,83 @@ async function getServicesFromPanel(panel: any) {
       key: panel.api_key,
       action: "services"
     }, { timeout: 15000 });
-    return response.data;
-  } catch {
+    return response.data || [];
+  } catch (err) {
+    console.error(`Services çekilemedi (${panel.panel_name}):`, err.message);
     return [];
   }
 }
 
-async function getBestPanel(service_name: string, quantity: number, salesPrice: number) {
-  const panels = await supabase
+async function chooseBestPanel(service_name: string, quantity: number, salesPrice: number) {
+  const { data: panels } = await supabase
     .from('panel_configs')
     .select('*')
     .eq('is_active', true)
-    .order('priority');
+    .order('priority', { ascending: true });
 
   let bestPanel = null;
-  let bestScore = -1;
+  let bestScore = -999999;
 
-  for (const panel of panels.data || []) {
+  for (const panel of panels || []) {
     const services = await getServicesFromPanel(panel);
+    
+    // Hizmet adı eşleştirme (kısmi eşleşme)
     const matchingService = services.find((s: any) => 
-      s.name && s.name.toLowerCase().includes(service_name.toLowerCase().slice(0, 15))
+      s.name && s.name.toLowerCase().includes(service_name.toLowerCase().slice(0, 20))
     );
 
     if (!matchingService) continue;
 
-    const panelCost = parseFloat(matchingService.rate) * (quantity / 1000);
+    const panelCostPer1000 = parseFloat(matchingService.rate) || 999;
+    const panelCost = panelCostPer1000 * (quantity / 1000);
     const profit = salesPrice - panelCost;
 
-    // Skor hesaplama: Kar + Başarı oranı + Hız
-    let score = profit * 10;
-    score += (panel.success_rate || 95) * 2;
+    // Skor hesaplama: Kar + Başarı oranı + Stabilite
+    let score = profit * 15;                    // Kar öncelikli
+    score += (panel.success_rate || 95) * 3;    // Başarı oranı
+    score -= (panel.error_count || 0) * 5;      // Hata cezası
 
     if (score > bestScore) {
       bestScore = score;
-      bestPanel = { ...panel, estimated_cost: panelCost, estimated_profit: profit };
+      bestPanel = {
+        ...panel,
+        estimated_cost: panelCost,
+        estimated_profit: profit,
+        service_rate: panelCostPer1000
+      };
     }
   }
 
   return bestPanel;
 }
 
+async function tryAddOrder(panel: any, orderData: any) {
+  try {
+    const payload = {
+      key: panel.api_key,
+      action: "add",
+      service: 1,
+      link: orderData.link,
+      quantity: Number(orderData.quantity) || 1000,
+    };
+
+    const response = await axios.post(panel.api_url, payload, { timeout: 25000 });
+    const result = response.data;
+
+    return {
+      success: true,
+      smm_order_id: result.order || result.order_id || "unknown",
+      panel_name: panel.panel_name
+    };
+  } catch (err: any) {
+    console.error(`[${panel.panel_name}] Sipariş hatası:`, err.message);
+    return { success: false, error: err.message };
+  }
+}
+
 export async function POST(request: NextRequest) {
+  const startTime = Date.now();
+
   try {
     const body = await request.json();
 
@@ -77,15 +113,15 @@ export async function POST(request: NextRequest) {
       link,
       extra_info,
       username,
-      price: salesPrice = 0   // ItemSatış'tan gelen satış fiyatı
+      price: salesPrice = 0
     } = body;
 
     const finalLink = link || extra_info || username || null;
 
-    console.log(`🛒 Sipariş Alındı → ID: ${order_id} | Hizmet: ${service_name} | Satış Fiyatı: $${salesPrice}`);
+    console.log(`🛒 Sipariş Alındı → ID: ${order_id} | Hizmet: ${service_name} | Satış: $${salesPrice}`);
 
-    // Akıllı Panel Seçimi (Fiyat Karşılaştırmalı)
-    const bestPanel = await getBestPanel(service_name, quantity, salesPrice);
+    // Akıllı Panel Seçimi (Fiyat + Karşılaştırma)
+    const bestPanel = await chooseBestPanel(service_name, quantity, salesPrice);
 
     if (!bestPanel) {
       await sendTelegram(`❌ <b>Panel Seçilemedi!</b>\nSipariş ID: <code>${order_id}</code>\nHizmet: ${service_name}`);
@@ -108,8 +144,10 @@ export async function POST(request: NextRequest) {
       used_panel: bestPanel.panel_name,
       sales_price: salesPrice,
       cost_price: bestPanel.estimated_cost,
-      fail_reason: result.success ? null : "Panel başarısız"
+      fail_reason: result.success ? null : "Seçilen panel başarısız"
     });
+
+    const duration = Date.now() - startTime;
 
     if (result.success) {
       const msg = `✅ <b>Sipariş Başarılı!</b>\n\n` +
@@ -133,37 +171,16 @@ export async function POST(request: NextRequest) {
 
   } catch (error: any) {
     console.error("Webhook hata:", error);
-    await sendTelegram(`🚨 Webhook Hatası!\n${error.message}`);
+    await sendTelegram(`🚨 <b>Webhook Hatası!</b>\n${error.message}`);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
-  }
-}
-
-async function tryAddOrder(panel: any, orderData: any) {
-  try {
-    const payload = {
-      key: panel.api_key,
-      action: "add",
-      service: 1,
-      link: orderData.link,
-      quantity: Number(orderData.quantity) || 1000,
-    };
-
-    const response = await axios.post(panel.api_url, payload, { timeout: 25000 });
-    const result = response.data;
-
-    return {
-      success: true,
-      smm_order_id: result.order || result.order_id || "unknown"
-    };
-  } catch (err: any) {
-    return { success: false };
   }
 }
 
 export async function GET() {
   return NextResponse.json({
     status: "ok",
-    message: "Fiyat Karşılaştırmalı Webhook v1 Aktif",
-    note: "Hizmet fiyatları karşılaştırılarak en uygun panel seçiliyor"
+    message: "Fiyat Karşılaştırmalı Akıllı Webhook v1 Aktif",
+    panels: "3 Panel (MoreThanPanel + SMMKings + Medyabayim)",
+    note: "Hizmet fiyatları karşılaştırılarak en karlı panel seçiliyor"
   });
 }
