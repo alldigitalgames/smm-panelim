@@ -20,11 +20,16 @@ async function sendTelegram(message: string) {
 }
 
 async function getActivePanels() {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('panel_configs')
     .select('*')
     .eq('is_active', true)
     .order('priority', { ascending: true });
+
+  if (error) {
+    console.error("Panel yükleme hatası:", error);
+    return [];
+  }
   return data || [];
 }
 
@@ -33,7 +38,7 @@ async function tryAddOrder(panel: any, orderData: any) {
     const payload = {
       key: panel.api_key,
       action: "add",
-      service: 1,
+      service: 1,                    // İleride dinamik yapılacak
       link: orderData.link,
       quantity: Number(orderData.quantity) || 1000,
     };
@@ -51,7 +56,7 @@ async function tryAddOrder(panel: any, orderData: any) {
       panel_name: panel.panel_name
     };
   } catch (err: any) {
-    console.error(`[${panel.panel_name}] Hata:`, err.message);
+    console.error(`[${panel.panel_name}] Başarısız:`, err.message);
     return { success: false, error: err.message };
   }
 }
@@ -65,105 +70,86 @@ export async function POST(request: NextRequest) {
     const {
       order_id,
       email,
-      service_name = "Bilinmeyen Hizmet",
-      quantity = 1000,
+      service_name,
+      quantity,
       link,
-      extra_info,
-      username
+      extra_info
     } = body;
 
-    const finalLink = link || extra_info || username || null;
+    const finalLink = link || extra_info || null;
 
-    // Tekrar tetiklenmeyi önleme (Idempotency)
-    if (order_id) {
-      const { data: existing } = await supabase
-        .from('orders')
-        .select('id')
-        .eq('itemsatis_order_id', order_id.toString())
-        .single();
-
-      if (existing) {
-        console.log(`Sipariş zaten işlenmiş: ${order_id}`);
-        return NextResponse.json({ success: true, message: "Already processed" });
-      }
-    }
-
-    console.log(`🛒 Sipariş Alındı → ID: ${order_id} | Hizmet: ${service_name} | Link: ${finalLink ? 'VAR' : 'YOK'}`);
+    console.log(`🛒 Yeni Sipariş: ${order_id} | ${service_name} | ${quantity} adet | Link: ${finalLink ? 'VAR' : 'YOK'}`);
 
     const panels = await getActivePanels();
     if (panels.length === 0) {
-      await sendTelegram(`❌ <b>Kritik Hata:</b> Aktif panel bulunamadı!\nSipariş ID: <code>${order_id}</code>`);
+      await sendTelegram(`❌ Kritik: Aktif panel bulunamadı! Sipariş ID: ${order_id}`);
       return NextResponse.json({ error: "No active panels" }, { status: 503 });
     }
 
     let successResult = null;
     let usedPanel = "";
-    let attempts = 0;
+    let attempt = 0;
 
+    // 4 Panel Failover
     for (const panel of panels) {
-      attempts++;
+      attempt++;
       const result = await tryAddOrder(panel, { link: finalLink, quantity });
 
       if (result.success) {
         successResult = result;
         usedPanel = panel.panel_name;
-        console.log(`✅ Başarılı → ${usedPanel} (Deneme ${attempts}/${panels.length})`);
+        console.log(`✅ Başarılı → ${usedPanel} (Deneme ${attempt}/4)`);
         break;
       }
     }
 
+    // Veritabanına kaydet
     await supabase.from('orders').insert({
       itemsatis_order_id: order_id?.toString(),
       user_email: email,
-      service_name,
-      quantity: Number(quantity),
+      service_name: service_name || "Bilinmeyen Hizmet",
+      quantity: Number(quantity) || 0,
       link: finalLink,
       status: successResult ? "processing" : "failed",
       smm_order_id: successResult?.smm_order_id,
       used_panel: usedPanel,
-      fail_reason: successResult ? null : (finalLink ? "Tüm paneller başarısız" : "Link eksik")
+      fail_reason: successResult ? null : (finalLink ? "Tüm paneller başarısız" : "Instagram linki eksik")
     });
 
-    const duration = Date.now() - startTime;
-
+    // Telegram Bildirimi
     if (successResult) {
       const msg = `✅ <b>Sipariş Başarılı!</b>\n\n` +
                   `Sipariş ID: <code>${order_id}</code>\n` +
                   `Hizmet: ${service_name}\n` +
                   `Miktar: ${quantity}\n` +
                   `Link: ${finalLink || '—'}\n` +
-                  `Panel: ${usedPanel}\n` +
-                  `Süre: ${duration}ms`;
+                  `Kullanılan Panel: ${usedPanel}\n` +
+                  `SMM ID: ${successResult.smm_order_id}`;
 
       await sendTelegram(msg);
     } else {
       const failMsg = `❌ <b>Sipariş Başarısız Oldu!</b>\n\n` +
                       `Sipariş ID: <code>${order_id}</code>\n` +
                       `Hizmet: ${service_name}\n` +
-                      `Miktar: ${quantity}\n` +
-                      `Link: ${finalLink || 'Eksik'}\n` +
-                      `Deneme: ${attempts}/${panels.length}`;
+                      `Link: ${finalLink ? 'Var' : 'Eksik'}\n` +
+                      `Denenen Paneller: 4/4`;
 
       await sendTelegram(failMsg);
     }
 
     return NextResponse.json({
       success: !!successResult,
-      used_panel: usedPanel,
-      duration_ms: duration
+      used_panel: usedPanel || "Hiçbiri",
+      processing_time: Date.now() - startTime + "ms"
     });
 
   } catch (error: any) {
-    console.error("Webhook kritik hata:", error);
-    await sendTelegram(`🚨 <b>Webhook Kritik Hata!</b>\n${error.message}`);
+    console.error("Webhook hatası:", error);
+    await sendTelegram(`🚨 Webhook Genel Hata!\nHata: ${error.message}`);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }
 
 export async function GET() {
   return NextResponse.json({
-    status: "ok",
-    message: "Webhook Optimized v4 - Tekrar Tetiklenme Koruması Aktif",
-    panels: "3 Panel (MoreThanPanel + SMMKings + Medyabayim)"
-  });
-}
+   
