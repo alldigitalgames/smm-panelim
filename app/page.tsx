@@ -19,24 +19,18 @@ export default function SiparisLogPaneli() {
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error("Sipariş çekme hatası:", error);
-    } else {
-      setOrders(data || []);
-    }
+    if (error) console.error(error);
+    else setOrders(data || []);
     setLoading(false);
   };
 
-  // Arama filtresi
-  const filteredOrders = orders.filter(order =>
+  const filteredOrders = orders.filter(order => 
     (order.service_name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-    (order.itemsatis_order_id?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-    (order.used_panel?.toLowerCase() || '').includes(searchTerm.toLowerCase())
+    (order.itemsatis_order_id?.toString() || '').includes(searchTerm)
   );
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
-      {/* Header */}
       <header className="border-b border-zinc-800 bg-zinc-900 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-8 py-6 flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -48,7 +42,7 @@ export default function SiparisLogPaneli() {
           </div>
           <button 
             onClick={fetchOrders}
-            className="flex items-center gap-2 px-6 py-3 bg-zinc-800 hover:bg-zinc-700 rounded-2xl text-sm font-medium transition"
+            className="flex items-center gap-2 px-6 py-3 bg-zinc-800 hover:bg-zinc-700 rounded-2xl text-sm transition"
           >
             🔄 Yenile
           </button>
@@ -56,49 +50,46 @@ export default function SiparisLogPaneli() {
       </header>
 
       <div className="max-w-7xl mx-auto px-8 py-12">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
+        <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
           <h1 className="text-4xl font-bold">Gerçek Zamanlı Sipariş Kayıtları</h1>
           
-          <div className="relative w-full md:w-96">
-            <input
-              type="text"
-              placeholder="Sipariş No, Hizmet veya Panel ara..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-zinc-900 border border-zinc-700 rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-emerald-500"
-            />
-          </div>
+          <input
+            type="text"
+            placeholder="Sipariş No veya Hizmet ara..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="bg-zinc-900 border border-zinc-700 focus:border-emerald-500 rounded-2xl px-5 py-3 w-full md:w-96 text-sm"
+          />
         </div>
 
         {loading ? (
-          <div className="text-center py-20 text-zinc-500">Yükleniyor...</div>
+          <p className="text-center py-20 text-zinc-500">Yükleniyor...</p>
         ) : filteredOrders.length === 0 ? (
-          <div className="text-center py-20 text-zinc-500">Henüz sipariş kaydı bulunmuyor veya arama kriterine uyan kayıt yok.</div>
+          <p className="text-center py-20 text-zinc-500">Henüz sipariş kaydı yok veya arama kriterine uyan kayıt bulunamadı.</p>
         ) : (
           <div className="overflow-x-auto rounded-3xl border border-zinc-800 bg-zinc-900">
-            <table className="w-full min-w-full">
+            <table className="w-full">
               <thead>
                 <tr className="bg-zinc-800 border-b border-zinc-700">
-                  <th className="px-8 py-5 text-left font-medium text-zinc-400 w-48">Sipariş No</th>
-                  <th className="px-8 py-5 text-left font-medium text-zinc-400 w-52">Tarih & Saat</th>
-                  <th className="px-8 py-5 text-left font-medium text-zinc-400">Hizmet / İlan</th>
-                  <th className="px-8 py-5 text-left font-medium text-zinc-400 w-40">Kullanılan Panel</th>
-                  <th className="px-8 py-5 text-left font-medium text-zinc-400 w-32">Satış Fiyatı</th>
-                  <th className="px-8 py-5 text-left font-medium text-zinc-400 w-32">Alım Maliyeti</th>
-                  <th className="px-8 py-5 text-left font-medium text-zinc-400 w-40">Durum</th>
-                  <th className="px-8 py-5 text-left font-medium text-zinc-400">Link</th>
+                  <th className="px-8 py-6 text-left font-medium text-zinc-400 w-52">Sipariş No</th>
+                  <th className="px-8 py-6 text-left font-medium text-zinc-400 w-52">Tarih & Saat</th>
+                  <th className="px-8 py-6 text-left font-medium text-zinc-400">Hizmet / İlan</th>
+                  <th className="px-8 py-6 text-left font-medium text-zinc-400 w-44">Kullanılan Panel</th>
+                  <th className="px-8 py-6 text-left font-medium text-zinc-400 w-40">Satış Fiyatı</th>
+                  <th className="px-8 py-6 text-left font-medium text-zinc-400 w-40">Alım Maliyeti</th>
+                  <th className="px-8 py-6 text-left font-medium text-zinc-400 w-40">Durum</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800">
                 {filteredOrders.map((order) => (
-                  <tr key={order.id} className="hover:bg-zinc-800/70 transition-colors">
-                    <td className="px-8 py-6 font-mono text-sm text-zinc-300">{order.itemsatis_order_id || '-'}</td>
-                    <td className="px-8 py-6 text-sm text-zinc-400">
+                  <tr key={order.id} className="hover:bg-zinc-800/60 transition-colors">
+                    <td className="px-8 py-6 font-mono">{order.itemsatis_order_id || '-'}</td>
+                    <td className="px-8 py-6 text-zinc-400">
                       {new Date(order.created_at).toLocaleString('tr-TR')}
                     </td>
-                    <td className="px-8 py-6 text-zinc-200 font-medium">{order.service_name}</td>
+                    <td className="px-8 py-6 text-zinc-200">{order.service_name}</td>
                     <td className="px-8 py-6">
-                      <span className="px-5 py-1.5 bg-emerald-900/60 text-emerald-400 rounded-full text-xs font-medium">
+                      <span className="px-5 py-1 bg-emerald-900 text-emerald-400 rounded-full text-xs">
                         {order.used_panel || '—'}
                       </span>
                     </td>
@@ -109,7 +100,7 @@ export default function SiparisLogPaneli() {
                       {order.cost_price ? `$${order.cost_price}` : '-'}
                     </td>
                     <td className="px-8 py-6">
-                      <span className={`px-5 py-1.5 rounded-full text-xs font-medium ${
+                      <span className={`px-6 py-2 rounded-full text-xs font-medium ${
                         order.status === 'completed' ? 'bg-green-900 text-green-400' :
                         order.status === 'processing' ? 'bg-amber-900 text-amber-400' : 
                         'bg-red-900 text-red-400'
@@ -117,9 +108,6 @@ export default function SiparisLogPaneli() {
                         {order.status === 'completed' ? '✅ Tamamlandı' : 
                          order.status === 'processing' ? '⏳ İşleniyor' : '❌ Başarısız'}
                       </span>
-                    </td>
-                    <td className="px-8 py-6 text-sm text-zinc-500 truncate max-w-xs">
-                      {order.link ? order.link : '-'}
                     </td>
                   </tr>
                 ))}
