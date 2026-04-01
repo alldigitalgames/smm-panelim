@@ -26,7 +26,7 @@ export async function GET() {
       message: "✅ Test siparişi webhook'a gönderildi",
       test_order_id: testOrder.order_id,
       webhook_response: result,
-      note: "Telegram'a bildirim gitmiş olmalı!"
+      note: "Telegram bildirimi kontrol et!"
     });
 
   } catch (error: any) {
