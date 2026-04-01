@@ -15,6 +15,39 @@ async function sendTelegram(message: string) {
   } catch (e) {}
 }
 
+async function getActivePanels() {
+  const { data } = await supabase
+    .from('panel_configs')
+    .select('*')
+    .eq('is_active', true)
+    .order('priority', { ascending: true });
+  return data || [];
+}
+
+async function tryAddOrder(panel: any, orderData: any) {
+  try {
+    const payload = {
+      key: panel.api_key,
+      action: "add",
+      service: panel.service_id || 10,
+      link: orderData.link,
+      quantity: Number(orderData.quantity) || 500,
+    };
+
+    const response = await axios.post(panel.api_url, payload, { timeout: 30000 });
+    const data = response.data;
+    const smmOrderId = data.order || data.order_id || data.id || null;
+
+    return {
+      success: !!smmOrderId,
+      smm_order_id: smmOrderId,
+      panel_name: panel.panel_name
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -28,32 +61,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Link eksik" }, { status: 400 });
     }
 
-    // TurkPaneli için geniş service ID aralığı
-    const serviceIds = [1, 2, 3, 4, 5, 10, 11, 12, 15, 20, 25, 30, 35, 40, 50, 60, 70, 80, 90, 100];
-    let smmOrderId = null;
-    let usedService = null;
-    let usedPanel = "turkpaneli";
+    const panels = await getActivePanels();
+    let successResult = null;
+    let usedPanel = "";
 
-    for (const servId of serviceIds) {
-      const payload = {
-        key: "45012f53fc16cebd045cc91151bdd4a5",
-        action: "add",
-        service: servId,
-        link: finalLink,
-        quantity: Number(quantity) || 500,
-      };
-
-      try {
-        const response = await axios.post("https://turkpaneli.com/api/v2", payload, { timeout: 25000 });
-        const data = response.data;
-
-        if (data.order || data.order_id || data.id) {
-          smmOrderId = data.order || data.order_id || data.id;
-          usedService = servId;
-          break;
-        }
-      } catch (err) {
-        // sonraki ID'yi dene
+    for (const panel of panels) {
+      const result = await tryAddOrder(panel, { link: finalLink, quantity });
+      if (result.success) {
+        successResult = result;
+        usedPanel = panel.panel_name;
+        break;
       }
     }
 
@@ -64,26 +81,26 @@ export async function POST(request: NextRequest) {
       link: finalLink,
       sales_price: salesPrice,
       cost_price: 0.85,
-      status: smmOrderId ? "processing" : "failed",
-      smm_order_id: smmOrderId,
+      status: successResult ? "processing" : "failed",
+      smm_order_id: successResult?.smm_order_id,
       used_panel: usedPanel,
-      fail_reason: smmOrderId ? null : "TurkPaneli doğru service_id bulamadı"
+      fail_reason: successResult ? null : "Tüm paneller başarısız"
     });
 
-    if (smmOrderId) {
-      await sendTelegram(`✅ Başarılı!\nSipariş ID: ${order_id}\nService ID: ${usedService}\nSMM Order ID: ${smmOrderId}`);
+    if (successResult) {
+      await sendTelegram(`✅ Sipariş Başarılı!\nID: ${order_id}\nPanel: ${usedPanel}\nSMM Order ID: ${successResult.smm_order_id}`);
     } else {
-      await sendTelegram(`❌ TurkPaneli Tüm Service ID'leri denedi ve başarısız oldu!\nSipariş ID: ${order_id}`);
+      await sendTelegram(`❌ Sipariş Başarısız Oldu!\nID: ${order_id}`);
     }
 
-    return NextResponse.json({ success: !!smmOrderId });
+    return NextResponse.json({ success: !!successResult });
 
   } catch (error: any) {
-    await sendTelegram(`🚨 Genel Hata: ${error.message}`);
+    await sendTelegram(`🚨 Hata: ${error.message}`);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
 export async function GET() {
-  return NextResponse.json({ status: "ok", message: "Service ID Auto Search Aktif" });
+  return NextResponse.json({ status: "ok", message: "Full Failover Aktif" });
 }
