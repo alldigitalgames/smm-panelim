@@ -69,36 +69,36 @@ export default function SiparisLogPaneli() {
             <table className="w-full">
               <thead>
                 <tr className="bg-zinc-800 border-b-2 border-zinc-600">
-                  <th className="px-8 py-6 text-left font-medium text-zinc-400 w-56 border-r-4 border-zinc-700">Sipariş No</th>
-                  <th className="px-8 py-6 text-left font-medium text-zinc-400 w-52 border-r-4 border-zinc-700">Tarih & Saat</th>
-                  <th className="px-8 py-6 text-left font-medium text-zinc-400 border-r-4 border-zinc-700">Hizmet</th>
-                  <th className="px-8 py-6 text-left font-medium text-zinc-400 w-44 border-r-4 border-zinc-700">Kullanılan Panel</th>
-                  <th className="px-8 py-6 text-left font-medium text-emerald-400 w-40 border-r-4 border-zinc-700">Satış Fiyatı</th>
-                  <th className="px-8 py-6 text-left font-medium text-amber-400 w-40 border-r-4 border-zinc-700">Alım Maliyeti</th>
-                  <th className="px-8 py-6 text-left font-medium text-zinc-400 w-40 border-r-4 border-zinc-700">Durum</th>
+                  <th className="px-8 py-6 text-left font-medium text-zinc-400 w-56 border-r-4 border-white/30">Sipariş No</th>
+                  <th className="px-8 py-6 text-left font-medium text-zinc-400 w-52 border-r-4 border-white/30">Tarih & Saat</th>
+                  <th className="px-8 py-6 text-left font-medium text-zinc-400 border-r-4 border-white/30">Hizmet</th>
+                  <th className="px-8 py-6 text-left font-medium text-zinc-400 w-44 border-r-4 border-white/30">Kullanılan Panel</th>
+                  <th className="px-8 py-6 text-left font-medium text-emerald-400 w-40 border-r-4 border-white/30">Satış Fiyatı</th>
+                  <th className="px-8 py-6 text-left font-medium text-amber-400 w-40 border-r-4 border-white/30">Alım Maliyeti</th>
+                  <th className="px-8 py-6 text-left font-medium text-zinc-400 w-40 border-r-4 border-white/30">Durum</th>
                   <th className="px-8 py-6 text-left font-medium text-zinc-400">Müşteri Linki</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800">
                 {filteredOrders.map((order) => (
                   <tr key={order.id} className="hover:bg-zinc-800/60 transition-colors">
-                    <td className="px-8 py-6 font-mono border-r-4 border-zinc-700">{order.itemsatis_order_id || '-'}</td>
-                    <td className="px-8 py-6 text-sm border-r-4 border-zinc-700 text-zinc-400">
+                    <td className="px-8 py-6 font-mono border-r-4 border-white/30">{order.itemsatis_order_id || '-'}</td>
+                    <td className="px-8 py-6 text-sm border-r-4 border-white/30 text-zinc-400">
                       {new Date(order.created_at).toLocaleString('tr-TR')}
                     </td>
-                    <td className="px-8 py-6 border-r-4 border-zinc-700 text-zinc-200">{order.service_name}</td>
-                    <td className="px-8 py-6 border-r-4 border-zinc-700">
+                    <td className="px-8 py-6 border-r-4 border-white/30 text-zinc-200">{order.service_name}</td>
+                    <td className="px-8 py-6 border-r-4 border-white/30">
                       <span className="px-5 py-1.5 bg-emerald-900 text-emerald-400 rounded-full text-xs">
                         {order.used_panel || '—'}
                       </span>
                     </td>
-                    <td className="px-8 py-6 border-r-4 border-zinc-700 font-semibold text-emerald-400">
+                    <td className="px-8 py-6 border-r-4 border-white/30 font-semibold text-emerald-400">
                       {order.sales_price ? `$${order.sales_price}` : '-'}
                     </td>
-                    <td className="px-8 py-6 border-r-4 border-zinc-700 font-semibold text-amber-400">
+                    <td className="px-8 py-6 border-r-4 border-white/30 font-semibold text-amber-400">
                       {order.cost_price ? `$${order.cost_price}` : '-'}
                     </td>
-                    <td className="px-8 py-6 border-r-4 border-zinc-700">
+                    <td className="px-8 py-6 border-r-4 border-white/30">
                       <span className={`px-6 py-2 rounded-full text-xs font-medium ${
                         order.status === 'completed' ? 'bg-green-900 text-green-400' :
                         order.status === 'processing' ? 'bg-amber-900 text-amber-400' : 
