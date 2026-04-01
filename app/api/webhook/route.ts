@@ -16,23 +16,26 @@ async function sendTelegram(message: string) {
 }
 
 export async function POST(request: NextRequest) {
+  // 1. Gelen ham veriyi logla (debugging için)
   const rawBody = await request.text();
-  console.log("[RAW BODY FROM ITEMSATIS]", rawBody);
+  console.log("[ITEMSATIS RAW BODY]", rawBody);
 
   try {
     const body = JSON.parse(rawBody);
-    const { order_id, service_name, quantity, link, extra_info } = body;
+    const { order_id, service_name, quantity, link, extra_info, sales_price } = body;
 
     const finalLink = link || extra_info || null;
+    const salesPrice = sales_price ? Number(sales_price) : 9.9;
 
-    await sendTelegram(`📥 ItemSatış’tan webhook geldi!\nSipariş ID: ${order_id}\nLink: ${finalLink || 'YOK'}`);
+    // Debugging mesajı
+    await sendTelegram(`📥 ItemSatış’tan webhook geldi!\nSipariş ID: ${order_id || 'Bilinmiyor'}\nLink: ${finalLink || 'YOK'}`);
 
     if (!finalLink) {
       await sendTelegram(`⚠️ Link eksik! Sipariş: ${order_id}`);
       return NextResponse.json({ error: "Link eksik" }, { status: 400 });
     }
 
-    // TurkPaneli’ne gönder
+    // TurkPaneli’ne sipariş gönder
     const payload = {
       key: "45012f53fc16cebd045cc91151bdd4a5",
       action: "add",
@@ -41,33 +44,51 @@ export async function POST(request: NextRequest) {
       quantity: Number(quantity) || 500,
     };
 
-    const response = await axios.post("https://turkpaneli.com/api/v2", payload, { timeout: 30000 });
-    const data = response.data;
-    const smmOrderId = data.order || data.order_id || data.id || null;
+    let smmOrderId = null;
 
-    await supabase.from('orders').insert({
+    try {
+      const response = await axios.post("https://turkpaneli.com/api/v2", payload, { timeout: 30000 });
+      const data = response.data;
+      smmOrderId = data.order || data.order_id || data.id || null;
+      console.log("TurkPaneli Cevabı:", data);
+    } catch (err: any) {
+      console.error("TurkPaneli Hatası:", err.message);
+      await sendTelegram(`❌ TurkPaneli Hatası: ${err.message}`);
+    }
+
+    // Supabase’e kaydet
+    const { error } = await supabase.from('orders').insert({
       itemsatis_order_id: order_id?.toString(),
       service_name: service_name || "Instagram Takipçi",
       quantity: Number(quantity) || 0,
       link: finalLink,
-      sales_price: 9.9,
+      sales_price: salesPrice,
       cost_price: 0.85,
       status: smmOrderId ? "processing" : "failed",
       smm_order_id: smmOrderId,
       used_panel: "turkpaneli"
     });
 
-    await sendTelegram(`✅ TurkPaneli’ne sipariş gönderildi!\nSipariş ID: ${order_id}\nSMM Order ID: ${smmOrderId || '-'}`);
+    if (error) {
+      console.error("Supabase hatası:", error.message);
+      await sendTelegram(`⚠️ Veritabanı Kayıt Hatası: ${error.message}`);
+    }
 
-    return NextResponse.json({ success: true });
+    if (smmOrderId) {
+      await sendTelegram(`✅ Sipariş Başarılı!\nID: ${order_id}\nSMM Order ID: ${smmOrderId}`);
+    } else {
+      await sendTelegram(`❌ Sipariş TurkPaneli’ne gitmedi!\nID: ${order_id}`);
+    }
+
+    return NextResponse.json({ success: !!smmOrderId });
 
   } catch (error: any) {
-    console.error("Webhook hatası:", error);
-    await sendTelegram(`🚨 Webhook Hatası: ${error.message}`);
+    console.error("Genel webhook hatası:", error);
+    await sendTelegram(`🚨 Webhook Genel Hata: ${error.message}`);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
 export async function GET() {
-  return NextResponse.json({ status: "ok", message: "Webhook aktif" });
+  return NextResponse.json({ status: "ok", message: "Webhook Debugging Modu Aktif" });
 }
