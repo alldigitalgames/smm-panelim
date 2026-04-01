@@ -84,21 +84,4 @@ export default function SiparisLogPaneli() {
                   <tr key={order.id} className="hover:bg-zinc-800/60 transition-colors">
                     <td className="px-8 py-6 font-mono border-r-4 border-zinc-700">{order.itemsatis_order_id || '-'}</td>
                     <td className="px-8 py-6 text-sm border-r-4 border-zinc-700 text-zinc-400">
-                      {new Date(order.created_at).toLocaleString('tr-TR')}
-                    </td>
-                    <td className="px-8 py-6 border-r-4 border-zinc-700 text-zinc-200">{order.service_name}</td>
-                    <td className="px-8 py-6 border-r-4 border-zinc-700">
-                      <span className="px-5 py-1.5 bg-emerald-900 text-emerald-400 rounded-full text-xs">
-                        {order.used_panel || '—'}
-                      </span>
-                    </td>
-                    <td className="px-8 py-6 border-r-4 border-zinc-700 font-semibold text-emerald-400">
-                      {order.sales_price ? `$${order.sales_price}` : '-'}
-                    </td>
-                    <td className="px-8 py-6 border-r-4 border-zinc-700 font-semibold text-amber-400">
-                      {order.cost_price ? `$${order.cost_price}` : '-'}
-                    </td>
-                    <td className="px-8 py-6 border-r-4 border-zinc-700">
-                      <span className={`px-6 py-2 rounded-full text-xs font-medium ${
-                        order.status === 'completed' ? 'bg-green-900 text-green-400' :
-                        order.status === 'processing' ?
+                      {new Date(order.created_at).
