@@ -40,7 +40,7 @@ async function tryAddOrder(panel: any, orderData: any) {
     const payload = {
       key: panel.api_key,
       action: "add",
-      service: panel.service_id || 1,        // Dinamik service_id
+      service: panel.service_id || 1,
       link: orderData.link,
       quantity: Number(orderData.quantity) || 500,
     };
@@ -49,16 +49,21 @@ async function tryAddOrder(panel: any, orderData: any) {
       timeout: 35000 
     });
 
-    console.log(`[SUCCESS] ${panel.panel_name} → Order ID:`, response.data.order || response.data.order_id);
+    const data = response.data;
+    console.log(`[SUCCESS] ${panel.panel_name} → Full Response:`, data);
+
+    // TurkPaneli ve diğer paneller için olası order ID alanları
+    const smmOrderId = data.order || data.order_id || data.id || null;
 
     return {
       success: true,
-      smm_order_id: response.data.order || response.data.order_id || null,
+      smm_order_id: smmOrderId,
       panel_name: panel.panel_name,
       cost_price: 0.85
     };
   } catch (err: any) {
     console.error(`[FAIL] ${panel.panel_name}:`, err.message);
+    if (err.response) console.error("Response Data:", err.response.data);
     return { success: false, error: err.message };
   }
 }
