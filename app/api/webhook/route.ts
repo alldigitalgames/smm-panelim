@@ -27,23 +27,29 @@ async function getActivePanels() {
 
   if (error) {
     console.error("Panel configs hatası:", error);
-    await sendTelegram(`⚠️ Panel configs hatası: ${error.message}`);
+    await sendTelegram(`⚠️ Panel configs çekilemedi: ${error.message}`);
     return [];
   }
   return data || [];
 }
 
 async function tryAddOrder(panel: any, orderData: any) {
+  console.log(`[TRY-${panel.priority}] ${panel.panel_name} → Service: ${panel.service_id || 1}`);
+
   try {
     const payload = {
       key: panel.api_key,
       action: "add",
-      service: panel.service_id || 1,
+      service: panel.service_id || 1,        // Dinamik service_id
       link: orderData.link,
       quantity: Number(orderData.quantity) || 500,
     };
 
-    const response = await axios.post(panel.api_url, payload, { timeout: 30000 });
+    const response = await axios.post(panel.api_url, payload, { 
+      timeout: 35000 
+    });
+
+    console.log(`[SUCCESS] ${panel.panel_name} → Order ID:`, response.data.order || response.data.order_id);
 
     return {
       success: true,
@@ -52,7 +58,7 @@ async function tryAddOrder(panel: any, orderData: any) {
       cost_price: 0.85
     };
   } catch (err: any) {
-    console.error(`[${panel.panel_name}] Hata:`, err.message);
+    console.error(`[FAIL] ${panel.panel_name}:`, err.message);
     return { success: false, error: err.message };
   }
 }
@@ -64,8 +70,6 @@ export async function POST(request: NextRequest) {
 
     const finalLink = link || extra_info || null;
     const salesPrice = sales_price ? Number(sales_price) : null;
-
-    console.log(`[NEW ORDER] ID: ${order_id} | Link: ${finalLink || 'YOK'}`);
 
     if (!finalLink) {
       await sendTelegram(`⚠️ Link Eksik! Sipariş: ${order_id}`);
@@ -85,7 +89,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // === SUPABASE KAYIT (Hata yakalama eklendi) ===
+    // Supabase Kaydı
     const { error: insertError } = await supabase.from('orders').insert({
       itemsatis_order_id: order_id?.toString(),
       user_email: email,
@@ -97,30 +101,30 @@ export async function POST(request: NextRequest) {
       status: successResult ? "processing" : "failed",
       smm_order_id: successResult?.smm_order_id,
       used_panel: usedPanel,
-      fail_reason: successResult ? null : "Paneller başarısız"
+      fail_reason: successResult ? null : "Tüm paneller başarısız"
     });
 
     if (insertError) {
       console.error("Supabase insert hatası:", insertError);
-      await sendTelegram(`⚠️ Supabase Kayıt Hatası!\nSipariş: ${order_id}\nHata: ${insertError.message}`);
+      await sendTelegram(`⚠️ Supabase Kayıt Hatası: ${insertError.message}`);
     }
 
-    // Telegram Bildirimi
+    // Telegram
     if (successResult) {
-      await sendTelegram(`✅ <b>Sipariş Başarılı!</b>\nID: <code>${order_id}</code>\nHizmet: ${service_name}\nPanel: ${usedPanel}\nSatış: ${salesPrice ? '$' + salesPrice : '—'}`);
+      await sendTelegram(`✅ <b>Sipariş Başarılı!</b>\nID: <code>${order_id}</code>\nHizmet: ${service_name}\nPanel: ${usedPanel}\nSatış: $${salesPrice || '-'}`);
     } else {
-      await sendTelegram(`❌ <b>Sipariş Başarısız!</b>\nID: <code>${order_id}</code>\nHizmet: ${service_name}`);
+      await sendTelegram(`❌ <b>Sipariş Başarısız Oldu!</b>\nID: <code>${order_id}</code>\nHizmet: ${service_name}`);
     }
 
     return NextResponse.json({ success: !!successResult, used_panel: usedPanel });
 
   } catch (error: any) {
     console.error("Webhook genel hata:", error);
-    await sendTelegram(`🚨 Webhook Genel Hata!\nHata: ${error.message}`);
+    await sendTelegram(`🚨 Webhook Genel Hata: ${error.message}`);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }
 
 export async function GET() {
-  return NextResponse.json({ status: "ok", message: "Webhook Optimized" });
+  return NextResponse.json({ status: "ok", message: "Webhook Optimized v2" });
 }
