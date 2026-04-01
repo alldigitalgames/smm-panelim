@@ -38,7 +38,7 @@ async function tryAddOrder(panel: any, orderData: any) {
     const payload = {
       key: panel.api_key,
       action: "add",
-      service: 1,                    // İleride dinamik yapılacak
+      service: 1,
       link: orderData.link,
       quantity: Number(orderData.quantity) || 1000,
     };
@@ -90,7 +90,6 @@ export async function POST(request: NextRequest) {
     let usedPanel = "";
     let attempt = 0;
 
-    // 4 Panel Failover
     for (const panel of panels) {
       attempt++;
       const result = await tryAddOrder(panel, { link: finalLink, quantity });
@@ -103,7 +102,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Veritabanına kaydet
     await supabase.from('orders').insert({
       itemsatis_order_id: order_id?.toString(),
       user_email: email,
@@ -116,7 +114,6 @@ export async function POST(request: NextRequest) {
       fail_reason: successResult ? null : (finalLink ? "Tüm paneller başarısız" : "Instagram linki eksik")
     });
 
-    // Telegram Bildirimi
     if (successResult) {
       const msg = `✅ <b>Sipariş Başarılı!</b>\n\n` +
                   `Sipariş ID: <code>${order_id}</code>\n` +
@@ -129,27 +126,3 @@ export async function POST(request: NextRequest) {
       await sendTelegram(msg);
     } else {
       const failMsg = `❌ <b>Sipariş Başarısız Oldu!</b>\n\n` +
-                      `Sipariş ID: <code>${order_id}</code>\n` +
-                      `Hizmet: ${service_name}\n` +
-                      `Link: ${finalLink ? 'Var' : 'Eksik'}\n` +
-                      `Denenen Paneller: 4/4`;
-
-      await sendTelegram(failMsg);
-    }
-
-    return NextResponse.json({
-      success: !!successResult,
-      used_panel: usedPanel || "Hiçbiri",
-      processing_time: Date.now() - startTime + "ms"
-    });
-
-  } catch (error: any) {
-    console.error("Webhook hatası:", error);
-    await sendTelegram(`🚨 Webhook Genel Hata!\nHata: ${error.message}`);
-    return NextResponse.json({ error: "Internal error" }, { status: 500 });
-  }
-}
-
-export async function GET() {
-  return NextResponse.json({
-   
