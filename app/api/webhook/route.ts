@@ -58,6 +58,8 @@ async function tryAddOrder(panel: any, orderData: any) {
 }
 
 export async function POST(request: NextRequest) {
+  const startTime = Date.now();
+
   try {
     const body = await request.json();
 
@@ -68,15 +70,20 @@ export async function POST(request: NextRequest) {
       quantity,
       link,
       extra_info,
-      sales_price   // ItemSatış'tan gelen satış fiyatı
+      sales_price
     } = body;
 
     const finalLink = link || extra_info || null;
     const salesPrice = sales_price ? Number(sales_price) : null;
 
-    console.log(`🛒 Yeni Sipariş: ${order_id} | ${service_name} | ${quantity} | Link: ${finalLink ? 'VAR' : 'YOK'}`);
+    console.log(`🛒 Yeni Sipariş: ${order_id} | ${service_name} | ${quantity} adet | Link: ${finalLink ? 'VAR' : 'YOK'}`);
 
     const panels = await getActivePanels();
+    if (panels.length === 0) {
+      await sendTelegram(`❌ Kritik: Aktif panel bulunamadı! Sipariş ID: ${order_id}`);
+      return NextResponse.json({ error: "No active panels" }, { status: 503 });
+    }
+
     let successResult = null;
     let usedPanel = "";
 
@@ -89,7 +96,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Veritabanına kaydet (yeni sütunlar eklendi)
+    // Veritabanına kaydet
     await supabase.from('orders').insert({
       itemsatis_order_id: order_id?.toString(),
       user_email: email,
@@ -105,4 +112,32 @@ export async function POST(request: NextRequest) {
     });
 
     // Telegram Bildirimi
-    if (successResult)
+    if (successResult) {
+      const msg = `✅ <b>Sipariş Başarılı!</b>\n\nSipariş ID: <code>${order_id}</code>\nHizmet: ${service_name}\nMiktar: ${quantity}\nSatış Fiyatı: ${salesPrice ? '$' + salesPrice : '—'}\nKullanılan Panel: ${usedPanel}\nLink: ${finalLink || '—'}`;
+      await sendTelegram(msg);
+    } else {
+      const failMsg = `❌ <b>Sipariş Başarısız Oldu!</b>\n\nSipariş ID: <code>${order_id}</code>\nHizmet: ${service_name}\nLink: ${finalLink ? 'Var' : 'Eksik'}\nDenenen Paneller: 4/4`;
+      await sendTelegram(failMsg);
+    }
+
+    return NextResponse.json({
+      success: !!successResult,
+      used_panel: usedPanel || "Hiçbiri",
+      processing_time: Date.now() - startTime + "ms"
+    });
+
+  } catch (error: any) {
+    console.error("Webhook hatası:", error);
+    await sendTelegram(`🚨 Webhook Genel Hata!\nHata: ${error.message}`);
+    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+  }
+}
+
+export async function GET() {
+  return NextResponse.json({
+    status: "ok",
+    message: "Webhook Optimized - 4 Panel Failover Aktif",
+    panels: "TurkPaneli → SmmTakipcimTR → MedyaBayim → MoreThanPanel",
+    timestamp: new Date().toISOString()
+  });
+}
