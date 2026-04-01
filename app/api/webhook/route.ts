@@ -43,8 +43,8 @@ async function tryAddOrder(panel: any, orderData: any) {
       smm_order_id: smmOrderId,
       panel_name: panel.panel_name
     };
-  } catch (err: any) {
-    return { success: false, error: err.message };
+  } catch (err) {
+    return { success: false };
   }
 }
 
@@ -83,24 +83,23 @@ export async function POST(request: NextRequest) {
       cost_price: 0.85,
       status: successResult ? "processing" : "failed",
       smm_order_id: successResult?.smm_order_id,
-      used_panel: usedPanel,
-      fail_reason: successResult ? null : "Tüm paneller başarısız"
+      used_panel: usedPanel || "denenmedi"
     });
 
     if (successResult) {
-      await sendTelegram(`✅ Sipariş Başarılı!\nID: ${order_id}\nPanel: ${usedPanel}\nSMM Order ID: ${successResult.smm_order_id}`);
+      await sendTelegram(`✅ Sipariş Başarılı!\nID: ${order_id}\nPanel: ${usedPanel}\nSMM Order ID: ${successResult.smm_order_id || '-'}`);
     } else {
-      await sendTelegram(`❌ Sipariş Başarısız Oldu!\nID: ${order_id}`);
+      await sendTelegram(`❌ Sipariş Başarısız Oldu!\nID: ${order_id}\nTüm paneller denendi.`);
     }
 
     return NextResponse.json({ success: !!successResult });
 
   } catch (error: any) {
-    await sendTelegram(`🚨 Hata: ${error.message}`);
+    await sendTelegram(`🚨 Sistem Hatası: ${error.message}`);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
 export async function GET() {
-  return NextResponse.json({ status: "ok", message: "Full Failover Aktif" });
+  return NextResponse.json({ status: "ok", message: "Final Version - 4 Panel Failover Aktif" });
 }
