@@ -16,104 +16,71 @@ async function sendTelegram(message: string) {
   } catch (e) {}
 }
 
-async function getActivePanels() {
-  const { data } = await supabase
-    .from('panel_configs')
-    .select('*')
-    .eq('is_active', true)
-    .order('priority', { ascending: true });
-  return data || [];
-}
-
-async function tryAddOrder(panel: any, orderData: any) {
-  try {
-    const payload = {
-      key: panel.api_key,
-      action: "add",
-      service: panel.service_id || 1,
-      link: orderData.link,
-      quantity: Number(orderData.quantity) || 500,
-    };
-
-    const response = await axios.post(panel.api_url, payload, { timeout: 30000 });
-    const data = response.data;
-
-    const smmOrderId = data.order || data.order_id || data.id || null;
-
-    return {
-      success: true,
-      smm_order_id: smmOrderId,
-      panel_name: panel.panel_name,
-      cost_price: 0.85
-    };
-  } catch (err: any) {
-    console.error(`[${panel.panel_name}] Hata:`, err.message);
-    return { success: false, error: err.message };
-  }
-}
-
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { order_id, email, service_name, quantity, link, extra_info, sales_price } = body;
+    const { order_id, service_name, quantity, link, extra_info, sales_price } = body;
 
     const finalLink = link || extra_info || null;
-    const salesPrice = sales_price ? Number(sales_price) : null;
+    const salesPrice = sales_price ? Number(sales_price) : 9.9;
 
     if (!finalLink) {
-      await sendTelegram(`⚠️ Link Eksik! Sipariş: ${order_id}`);
+      await sendTelegram(`⚠️ Link eksik! Sipariş: ${order_id}`);
       return NextResponse.json({ error: "Link eksik" }, { status: 400 });
     }
 
-    const panels = await getActivePanels();
-    let successResult = null;
-    let usedPanel = "";
-    let attempt = 0;
+    // Sadece TurkPaneli (öncelik 1)
+    const turkPanelPayload = {
+      key: "45012f53fc16cebd045cc91151bdd4a5",
+      action: "add",
+      service: 1,
+      link: finalLink,
+      quantity: Number(quantity) || 500,
+    };
 
-    for (const panel of panels) {
-      attempt++;
-      const result = await tryAddOrder(panel, { link: finalLink, quantity });
+    let smmOrderId = null;
+    let usedPanel = "turkpaneli";
 
-      if (result.success) {
-        successResult = result;
-        usedPanel = panel.panel_name;
-        console.log(`✅ Başarılı → ${panel.panel_name} (Deneme ${attempt})`);
-        break;
-      } else {
-        console.log(`❌ Başarısız → ${panel.panel_name} (Deneme ${attempt})`);
-      }
+    try {
+      const response = await axios.post("https://turkpaneli.com/api/v2", turkPanelPayload, { timeout: 30000 });
+      const data = response.data;
+      smmOrderId = data.order || data.order_id || data.id || null;
+      console.log("TurkPaneli Response:", data);
+    } catch (err: any) {
+      console.error("TurkPaneli Hatası:", err.message);
+      await sendTelegram(`❌ TurkPaneli Bağlantı Hatası: ${err.message}`);
     }
 
-    // Supabase Kaydı
-    await supabase.from('orders').insert({
+    // Supabase'e kaydet (hata yakalama ile)
+    const { error } = await supabase.from('orders').insert({
       itemsatis_order_id: order_id?.toString(),
-      user_email: email,
-      service_name: service_name || "Bilinmeyen Hizmet",
+      service_name: service_name || "Instagram Takipçi",
       quantity: Number(quantity) || 0,
       link: finalLink,
       sales_price: salesPrice,
-      cost_price: successResult ? successResult.cost_price : null,
-      status: successResult ? "processing" : "failed",
-      smm_order_id: successResult?.smm_order_id,
+      cost_price: 0.85,
+      status: smmOrderId ? "processing" : "failed",
+      smm_order_id: smmOrderId,
       used_panel: usedPanel,
-      fail_reason: successResult ? null : "Tüm paneller başarısız"
+      fail_reason: smmOrderId ? null : "TurkPaneli başarısız"
     });
 
-    if (successResult) {
-      await sendTelegram(`✅ Sipariş Başarılı!\nID: ${order_id}\nHizmet: ${service_name}\nPanel: ${usedPanel}\nSMM Order ID: ${successResult.smm_order_id || '—'}`);
-    } else {
-      await sendTelegram(`❌ Tüm Paneller Başarısız Oldu!\nID: ${order_id}\nHizmet: ${service_name}`);
+    if (error) {
+      console.error("Supabase insert hatası:", error.message);
+      await sendTelegram(`⚠️ Veritabanı Kayıt Hatası: ${error.message}`);
     }
 
-    return NextResponse.json({ success: !!successResult, used_panel: usedPanel });
+    await sendTelegram(`✅ Sipariş İşleme Alındı!\nID: ${order_id}\nPanel: ${usedPanel}\nSMM Order ID: ${smmOrderId || '-'}`);
+
+    return NextResponse.json({ success: true, smm_order_id: smmOrderId });
 
   } catch (error: any) {
-    console.error("Webhook genel hata:", error);
-    await sendTelegram(`🚨 Webhook Genel Hata: ${error.message}`);
-    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+    console.error("Genel hata:", error);
+    await sendTelegram(`🚨 Genel Hata: ${error.message}`);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
 export async function GET() {
-  return NextResponse.json({ status: "ok", message: "Full Failover Aktif" });
+  return NextResponse.json({ status: "ok", message: "Basit TurkPaneli Modu" });
 }
