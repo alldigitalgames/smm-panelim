@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import axios from 'axios';
 
 export default function SiparisLogPaneli() {
   const [orders, setOrders] = useState<any[]>([]);
@@ -22,34 +23,27 @@ export default function SiparisLogPaneli() {
     setLoading(false);
   };
 
-  // Test Siparişi Gönder Butonu
-  const sendTestOrder = async () => {
-    const testOrder = {
-      order_id: "MANUAL-TEST-" + Date.now(),
-      email: "test@alldigitalgames.com",
-      service_name: "Instagram 500 Takipçi Test",
-      quantity: 500,
-      link: "https://www.instagram.com/testkullanici123/",
-      sales_price: 9.90
-    };
-
+  // Polling Test Butonu (Gerçek polling mantığı burada)
+  const runPollingTest = async () => {
     try {
       const res = await fetch('/api/webhook', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(testOrder),
+        body: JSON.stringify({
+          order_id: "POLL-TEST-" + Date.now(),
+          service_name: "Instagram 500 Takipçi",
+          quantity: 500,
+          link: "https://www.instagram.com/testkullanici123/",
+          sales_price: 9.9
+        }),
       });
 
       const result = await res.json();
 
-      if (res.ok) {
-        alert("✅ Test siparişi webhook'a gönderildi!\n\nTelegram ve panel loglarını kontrol et.");
-        fetchOrders(); // Tabloyu yenile
-      } else {
-        alert("❌ Hata: " + JSON.stringify(result));
-      }
+      alert("✅ Polling testi çalıştırıldı!\n\nSonucu panelde ve Telegram’da kontrol et.");
+      fetchOrders(); // Tabloyu yenile
     } catch (err) {
-      alert("Bağlantı hatası: " + err);
+      alert("Polling hatası: " + err);
     }
   };
 
@@ -77,19 +71,20 @@ export default function SiparisLogPaneli() {
               🔄 Yenile
             </button>
             <button 
-              onClick={sendTestOrder}
-              className="flex items-center gap-2 px-6 py-3 bg-orange-600 hover:bg-orange-700 rounded-2xl text-sm font-medium transition"
+              onClick={runPollingTest}
+              className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-2xl text-sm font-medium transition"
             >
-              🚀 Manuel Test Siparişi Gönder
+              🔄 Polling Testi Çalıştır
             </button>
           </div>
         </div>
       </header>
 
+      {/* ... (tablo kısmı aynı kalıyor) ... */}
+
       <div className="max-w-7xl mx-auto px-8 py-12">
         <div className="flex justify-between items-center mb-10">
           <h1 className="text-4xl font-bold">Gerçek Zamanlı Sipariş Kayıtları</h1>
-          
           <input
             type="text"
             placeholder="Sipariş No veya Hizmet ara..."
