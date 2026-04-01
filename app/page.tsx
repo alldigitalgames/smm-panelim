@@ -23,14 +23,14 @@ export default function SiparisLogPaneli() {
     setLoading(false);
   };
 
-  // Polling Test Butonu (Gerçek polling mantığı burada)
-  const runPollingTest = async () => {
+  // Polling Testi (Gerçek polling mantığı)
+  const runPolling = async () => {
     try {
       const res = await fetch('/api/webhook', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          order_id: "POLL-TEST-" + Date.now(),
+          order_id: "POLL-" + Date.now(),
           service_name: "Instagram 500 Takipçi",
           quantity: 500,
           link: "https://www.instagram.com/testkullanici123/",
@@ -39,9 +39,8 @@ export default function SiparisLogPaneli() {
       });
 
       const result = await res.json();
-
-      alert("✅ Polling testi çalıştırıldı!\n\nSonucu panelde ve Telegram’da kontrol et.");
-      fetchOrders(); // Tabloyu yenile
+      alert("✅ Polling testi çalıştırıldı!\n\nTelegram ve paneli kontrol et.");
+      fetchOrders();
     } catch (err) {
       alert("Polling hatası: " + err);
     }
@@ -60,31 +59,23 @@ export default function SiparisLogPaneli() {
             <div className="text-4xl font-bold text-emerald-400">ADG</div>
             <div>
               <div className="text-2xl font-bold tracking-tight">ALL DIGITAL GAMES</div>
-              <div className="text-sm text-emerald-400 -mt-1">SMM Panel • Gerçek Zamanlı Sipariş Kayıtları</div>
+              <div className="text-sm text-emerald-400 -mt-1">SMM Panel • Polling Sistemi Aktif</div>
             </div>
           </div>
           <div className="flex gap-3">
-            <button 
-              onClick={fetchOrders}
-              className="flex items-center gap-2 px-6 py-3 bg-zinc-800 hover:bg-zinc-700 rounded-2xl text-sm transition"
-            >
+            <button onClick={fetchOrders} className="flex items-center gap-2 px-6 py-3 bg-zinc-800 hover:bg-zinc-700 rounded-2xl text-sm transition">
               🔄 Yenile
             </button>
-            <button 
-              onClick={runPollingTest}
-              className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-2xl text-sm font-medium transition"
-            >
+            <button onClick={runPolling} className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-2xl text-sm font-medium transition">
               🔄 Polling Testi Çalıştır
             </button>
           </div>
         </div>
       </header>
 
-      {/* ... (tablo kısmı aynı kalıyor) ... */}
-
       <div className="max-w-7xl mx-auto px-8 py-12">
         <div className="flex justify-between items-center mb-10">
-          <h1 className="text-4xl font-bold">Gerçek Zamanlı Sipariş Kayıtları</h1>
+          <h1 className="text-4xl font-bold">Gerçek Zamanlı Sipariş Kayıtları (Polling Aktif)</h1>
           <input
             type="text"
             placeholder="Sipariş No veya Hizmet ara..."
