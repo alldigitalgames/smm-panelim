@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import * as XLSX from 'xlsx';
 
 export default function SiparisLogPaneli() {
   const [orders, setOrders] = useState<any[]>([]);
@@ -23,33 +22,41 @@ export default function SiparisLogPaneli() {
     setLoading(false);
   };
 
+  // Test Siparişi Gönder Butonu
+  const sendTestOrder = async () => {
+    const testOrder = {
+      order_id: "MANUAL-TEST-" + Date.now(),
+      email: "test@alldigitalgames.com",
+      service_name: "Instagram 500 Takipçi Test",
+      quantity: 500,
+      link: "https://www.instagram.com/testkullanici123/",
+      sales_price: 9.90
+    };
+
+    try {
+      const res = await fetch('/api/webhook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(testOrder),
+      });
+
+      const result = await res.json();
+
+      if (res.ok) {
+        alert("✅ Test siparişi webhook'a gönderildi!\n\nTelegram ve panel loglarını kontrol et.");
+        fetchOrders(); // Tabloyu yenile
+      } else {
+        alert("❌ Hata: " + JSON.stringify(result));
+      }
+    } catch (err) {
+      alert("Bağlantı hatası: " + err);
+    }
+  };
+
   const filteredOrders = orders.filter(order => 
     (order.service_name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
     (order.itemsatis_order_id?.toString() || '').includes(searchTerm)
   );
-
-  // Excel Export Fonksiyonu
-  const exportToExcel = () => {
-    const exportData = filteredOrders.map(order => ({
-      "Sipariş No": order.itemsatis_order_id || '-',
-      "Tarih & Saat": new Date(order.created_at).toLocaleString('tr-TR'),
-      "Hizmet": order.service_name || '-',
-      "Kullanılan Panel": order.used_panel || '-',
-      "Satış Fiyatı ($)": order.sales_price || '-',
-      "Alım Maliyeti ($)": order.cost_price || '-',
-      "Durum": order.status === 'completed' ? 'Tamamlandı' : 
-               order.status === 'processing' ? 'İşleniyor' : 'Başarısız',
-      "Müşteri Linki": order.link || '-',
-      "İşlem Süresi (ms)": order.processing_time_ms || '-',
-      "Deneme Sayısı": order.attempts_count || '-'
-    }));
-
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Sipariş Logları");
-
-    XLSX.writeFile(wb, `SMM_Siparis_Log_${new Date().toISOString().slice(0,10)}.xlsx`);
-  };
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
@@ -70,10 +77,10 @@ export default function SiparisLogPaneli() {
               🔄 Yenile
             </button>
             <button 
-              onClick={exportToExcel}
-              className="flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 rounded-2xl text-sm font-medium transition"
+              onClick={sendTestOrder}
+              className="flex items-center gap-2 px-6 py-3 bg-orange-600 hover:bg-orange-700 rounded-2xl text-sm font-medium transition"
             >
-              📥 Excel İndir
+              🚀 Manuel Test Siparişi Gönder
             </button>
           </div>
         </div>
