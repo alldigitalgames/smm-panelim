@@ -102,6 +102,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Veritabanına kaydet
     await supabase.from('orders').insert({
       itemsatis_order_id: order_id?.toString(),
       user_email: email,
@@ -114,15 +115,33 @@ export async function POST(request: NextRequest) {
       fail_reason: successResult ? null : (finalLink ? "Tüm paneller başarısız" : "Instagram linki eksik")
     });
 
+    // Telegram Bildirimi
     if (successResult) {
-      const msg = `✅ <b>Sipariş Başarılı!</b>\n\n` +
-                  `Sipariş ID: <code>${order_id}</code>\n` +
-                  `Hizmet: ${service_name}\n` +
-                  `Miktar: ${quantity}\n` +
-                  `Link: ${finalLink || '—'}\n` +
-                  `Kullanılan Panel: ${usedPanel}\n` +
-                  `SMM ID: ${successResult.smm_order_id}`;
-
+      const msg = `✅ <b>Sipariş Başarılı!</b>\n\nSipariş ID: <code>${order_id}</code>\nHizmet: ${service_name}\nMiktar: ${quantity}\nLink: ${finalLink || '—'}\nKullanılan Panel: ${usedPanel}\nSMM ID: ${successResult.smm_order_id}`;
       await sendTelegram(msg);
     } else {
-      const failMsg = `❌ <b>Sipariş Başarısız Oldu!</b>\n\n` +
+      const failMsg = `❌ <b>Sipariş Başarısız Oldu!</b>\n\nSipariş ID: <code>${order_id}</code>\nHizmet: ${service_name}\nLink: ${finalLink ? 'Var' : 'Eksik'}\nDenenen Paneller: 4/4`;
+      await sendTelegram(failMsg);
+    }
+
+    return NextResponse.json({
+      success: !!successResult,
+      used_panel: usedPanel || "Hiçbiri",
+      processing_time: Date.now() - startTime + "ms"
+    });
+
+  } catch (error: any) {
+    console.error("Webhook hatası:", error);
+    await sendTelegram(`🚨 Webhook Genel Hata!\nHata: ${error.message}`);
+    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+  }
+}
+
+export async function GET() {
+  return NextResponse.json({
+    status: "ok",
+    message: "Webhook Optimized - 4 Panel Failover Aktif",
+    panels: "TurkPaneli → SmmTakipcimTR → MedyaBayim → MoreThanPanel",
+    timestamp: new Date().toISOString()
+  });
+}
