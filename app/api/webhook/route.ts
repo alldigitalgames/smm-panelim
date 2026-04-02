@@ -16,13 +16,15 @@ async function sendTelegram(message: string) {
 }
 
 export async function POST(request: NextRequest) {
+  const rawBody = await request.text();
+
   try {
-    const body = await request.json();
+    const body = JSON.parse(rawBody);
     const { order_id, service_name, quantity, link, extra_info, sales_price } = body;
 
     const finalLink = link || extra_info || "❌ Link yazılmamış!";
 
-    const telegramMessage = 
+    const message = 
       `🛒 <b>YENİ SİPARİŞ GELDİ!</b>\n\n` +
       `Sipariş No: <code>${order_id}</code>\n` +
       `Hizmet: ${service_name || 'Bilinmiyor'}\n` +
@@ -30,11 +32,10 @@ export async function POST(request: NextRequest) {
       `Fiyat: ${sales_price ? '$' + sales_price : '-'}\n` +
       `Link: ${finalLink}\n\n` +
       `👉 Linki kopyala ve TurkPaneli’ne manuel olarak gir.\n` +
-      `Sipariş hazır bekliyor.`;
+      `Hazır bekliyor.`;
 
-    await sendTelegram(telegramMessage);
+    await sendTelegram(message);
 
-    // Panelde de kaydedelim (manuel takip için)
     await supabase.from('orders').insert({
       itemsatis_order_id: order_id?.toString(),
       service_name: service_name || "Bilinmeyen Hizmet",
@@ -45,11 +46,10 @@ export async function POST(request: NextRequest) {
       used_panel: "manuel"
     });
 
-    return NextResponse.json({ success: true, message: "Bildirim gönderildi" });
+    return NextResponse.json({ success: true });
 
   } catch (error: any) {
-    console.error("Webhook hatası:", error);
-    await sendTelegram(`🚨 Webhook Hatası: ${error.message}`);
+    await sendTelegram(`🚨 Webhook Parse Hatası: ${error.message}`);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
@@ -57,6 +57,6 @@ export async function POST(request: NextRequest) {
 export async function GET() {
   return NextResponse.json({ 
     status: "ok", 
-    message: "Manuel Bildirim Modu Aktif - Webhook çalışıyor" 
+    message: "Manuel Bildirim Modu Aktif" 
   });
 }
