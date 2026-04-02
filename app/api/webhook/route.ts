@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '../../../lib/supabase';
-import axios from 'axios';
 
 async function sendTelegram(message: string) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
