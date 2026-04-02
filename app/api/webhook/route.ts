@@ -27,9 +27,10 @@ export async function POST(request: NextRequest) {
       `Sipariş No: <code>${order_id}</code>\n` +
       `Hizmet: ${service_name || 'Bilinmiyor'}\n` +
       `Miktar: ${quantity || '-'}\n` +
-      `Satış Fiyatı: ${sales_price ? '$' + sales_price : '-'}\n` +
+      `Fiyat: ${sales_price ? '$' + sales_price : '-'}\n` +
       `Link: ${finalLink}\n\n` +
-      `👉 Linki kopyala ve TurkPaneli’ne manuel gir.`;
+      `👉 Linki kopyala ve TurkPaneli’ne manuel olarak gir.\n` +
+      `Sipariş hazır bekliyor.`;
 
     await sendTelegram(telegramMessage);
 
@@ -44,7 +45,7 @@ export async function POST(request: NextRequest) {
       used_panel: "manuel"
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, message: "Bildirim gönderildi" });
 
   } catch (error: any) {
     console.error("Webhook hatası:", error);
@@ -54,5 +55,8 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET() {
-  return NextResponse.json({ status: "ok", message: "Manuel Bildirim Modu Aktif" });
+  return NextResponse.json({ 
+    status: "ok", 
+    message: "Manuel Bildirim Modu Aktif - Webhook çalışıyor" 
+  });
 }
