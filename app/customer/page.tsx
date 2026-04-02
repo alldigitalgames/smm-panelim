@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useSearchParams } from 'next/navigation';
 
-export default function CustomerOrderPage() {
+function CustomerOrderContent() {
   const searchParams = useSearchParams();
   const orderId = searchParams.get('order');
 
@@ -12,15 +12,19 @@ export default function CustomerOrderPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!orderId) return;
+    if (!orderId) {
+      setLoading(false);
+      return;
+    }
 
     const fetchOrder = async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('orders')
         .select('itemsatis_order_id, smm_order_id, status, service_name, created_at')
         .eq('itemsatis_order_id', orderId)
         .single();
 
+      if (error) console.error("Sipariş çekme hatası:", error);
       setOrder(data);
       setLoading(false);
     };
@@ -28,8 +32,20 @@ export default function CustomerOrderPage() {
     fetchOrder();
   }, [orderId]);
 
-  if (loading) return <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">Yükleniyor...</div>;
-  if (!order) return <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">Sipariş bulunamadı.</div>;
+  if (loading) {
+    return <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">Yükleniyor...</div>;
+  }
+
+  if (!order) {
+    return (
+      <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-4">Sipariş Bulunamadı</h2>
+          <p className="text-zinc-400">Bu sipariş numarası ile eşleşen bir kayıt bulunamadı.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white p-8">
@@ -62,7 +78,6 @@ export default function CustomerOrderPage() {
               <p className="text-xl font-mono font-medium text-emerald-400 mt-1">
                 {order.smm_order_id}
               </p>
-              <p className="text-xs text-zinc-500 mt-2">Bu numarayı panelde takip edebilirsiniz.</p>
             </div>
           )}
         </div>
@@ -72,5 +87,13 @@ export default function CustomerOrderPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function CustomerOrderPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">Yükleniyor...</div>}>
+      <CustomerOrderContent />
+    </Suspense>
   );
 }
