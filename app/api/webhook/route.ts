@@ -20,18 +20,18 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { order_id, service_name, quantity, link, extra_info, sales_price } = body;
 
-    const finalLink = link || extra_info || "Link yazılmamış!";
+    const finalLink = link || extra_info || "❌ Link yazılmamış!";
 
-    const message = 
-      `🛒 <b>Yeni Sipariş Geldi!</b>\n\n` +
+    const telegramMessage = 
+      `🛒 <b>YENİ SİPARİŞ GELDİ!</b>\n\n` +
       `Sipariş No: <code>${order_id}</code>\n` +
       `Hizmet: ${service_name || 'Bilinmiyor'}\n` +
       `Miktar: ${quantity || '-'}\n` +
       `Satış Fiyatı: ${sales_price ? '$' + sales_price : '-'}\n` +
       `Link: ${finalLink}\n\n` +
-      `✅ Manuel işlem için hazır. Linki kopyalayıp TurkPaneli’ne gir.`;
+      `👉 Linki kopyala ve TurkPaneli’ne manuel gir.`;
 
-    await sendTelegram(message);
+    await sendTelegram(telegramMessage);
 
     // Panelde de kaydedelim (manuel takip için)
     await supabase.from('orders').insert({
@@ -40,23 +40,19 @@ export async function POST(request: NextRequest) {
       quantity: Number(quantity) || 0,
       link: finalLink,
       sales_price: sales_price ? Number(sales_price) : null,
-      status: "pending",                    // Manuel işlem bekliyor
-      used_panel: "manuel",
-      fail_reason: "Manuel işlem gerekiyor"
+      status: "pending",
+      used_panel: "manuel"
     });
 
-    return NextResponse.json({ success: true, message: "Bildirim gönderildi" });
+    return NextResponse.json({ success: true });
 
   } catch (error: any) {
     console.error("Webhook hatası:", error);
-    await sendTelegram(`🚨 Webhook Genel Hata!\nHata: ${error.message}`);
+    await sendTelegram(`🚨 Webhook Hatası: ${error.message}`);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
 export async function GET() {
-  return NextResponse.json({ 
-    status: "ok", 
-    message: "Manuel Bildirim Modu Aktif - Webhook çalışıyor" 
-  });
+  return NextResponse.json({ status: "ok", message: "Manuel Bildirim Modu Aktif" });
 }
