@@ -16,26 +16,27 @@ async function sendTelegram(message: string) {
 }
 
 export async function POST(request: NextRequest) {
-  const rawBody = await request.text();
-
   try {
-    const body = JSON.parse(rawBody);
-    const { order_id, service_name, quantity, link, extra_info, sales_price } = body;
+    const body = await request.json();
+    const { order_id, service_name, quantity, link, extra_info, sales_price, platform = "itemsatis" } = body;
 
     const finalLink = link || extra_info || "❌ Link yazılmamış!";
 
+    const platformName = platform === "itempazar" ? "🟢 ItemPazar" : "🔵 ItemSatış";
+
     const message = 
-      `🛒 <b>YENİ SİPARİŞ GELDİ!</b>\n\n` +
+      `${platformName} <b>YENİ SİPARİŞ GELDİ!</b>\n\n` +
       `Sipariş No: <code>${order_id}</code>\n` +
       `Hizmet: ${service_name || 'Bilinmiyor'}\n` +
       `Miktar: ${quantity || '-'}\n` +
       `Fiyat: ${sales_price ? '$' + sales_price : '-'}\n` +
       `Link: ${finalLink}\n\n` +
-      `👉 Linki kopyala ve TurkPaneli’ne manuel olarak gir.\n` +
-      `Hazır bekliyor.`;
+      `👉 Linki kopyala ve TurkPaneli’ne manuel gir.\n` +
+      `Sipariş hazır bekliyor.`;
 
     await sendTelegram(message);
 
+    // Panelde manuel takip için kaydet
     await supabase.from('orders').insert({
       itemsatis_order_id: order_id?.toString(),
       service_name: service_name || "Bilinmeyen Hizmet",
@@ -43,13 +44,14 @@ export async function POST(request: NextRequest) {
       link: finalLink,
       sales_price: sales_price ? Number(sales_price) : null,
       status: "pending",
-      used_panel: "manuel"
+      used_panel: "manuel",
+      platform: platform
     });
 
     return NextResponse.json({ success: true });
 
   } catch (error: any) {
-    await sendTelegram(`🚨 Webhook Parse Hatası: ${error.message}`);
+    await sendTelegram(`🚨 Webhook Hatası: ${error.message}`);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
@@ -57,6 +59,6 @@ export async function POST(request: NextRequest) {
 export async function GET() {
   return NextResponse.json({ 
     status: "ok", 
-    message: "Manuel Bildirim Modu Aktif" 
+    message: "Manuel Bildirim Sistemi Aktif (Itemsatış + ItemPazar Destekli)" 
   });
 }
